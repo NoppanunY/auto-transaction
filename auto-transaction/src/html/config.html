@@ -2,12 +2,63 @@
   <h2 class="settings-heading">Settings for Auto Transaction</h2>
   <p class="kintoneplugin-desc">This message is displayed on the app page after the app has been updated.</p>
   <form class="js-submit-settings">
-    <p class="kintoneplugin-row">
-      <label for="message">
-        Message:
-        <input type="text" class="js-text-message kintoneplugin-input-text">
-      </label>
-    </p>
+    <div class="kintoneplugin-row">
+      <div class="kintoneplugin-label">
+        Destination:
+      </div>
+      <div class="kintoneplugin-select-outer">
+        <div class="kintoneplugin-select app-target">
+          <select name="app-target">
+            <option value="null" selected></option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="kintoneplugin-row mapping-table">
+      <!-- <table class="kintoneplugin-table">
+        <thead>
+          <tr>
+            <th class="kintoneplugin-table-th"><span class="title">Source</span></th>
+            <th class="kintoneplugin-table-th"><span class="title">Dest</span></th>
+            <th class="kintoneplugin-table-th-blankspace"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="kintoneplugin-table-td-control">
+                <div class="kintoneplugin-table-td-control-value">
+                  <div class="kintoneplugin-select-outer">
+                    <div class="kintoneplugin-select field-source">
+                      <select name="field-source">
+                        <option value="null"></option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="kintoneplugin-table-td-control">
+                <div class="kintoneplugin-table-td-control-value">
+                  <div class="kintoneplugin-select-outer">
+                    <div class="kintoneplugin-select field-dest">
+                      <select name="field-dest">
+                        <option value="null"></option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td class="kintoneplugin-table-td-operation">
+              <button type="button" class="kintoneplugin-button-add-row-image" title="Add row"></button>
+              <button type="button" class="kintoneplugin-button-remove-row-image" title="Delete this row"></button>
+            </td>
+          </tr>
+        </tbody>
+      </table> -->
+    </div>
     <p class="kintoneplugin-row">
         <button type="button" class="js-cancel-button kintoneplugin-button-dialog-cancel">Cancel</button>
         <button class="kintoneplugin-button-dialog-ok">Save</button>
