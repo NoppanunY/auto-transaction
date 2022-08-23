@@ -11,18 +11,18 @@ jQuery.noConflict();
     if (spaceElement === null) {
       throw new Error('The header element is unavailable on this page');
     }
-    var fragment = document.createDocumentFragment();
-    var headingEl = document.createElement('h3');
-    var messageEl = document.createElement('p');
+    // var fragment = document.createDocumentFragment();
+    // var headingEl = document.createElement('h3');
+    // var messageEl = document.createElement('p');
 
-    messageEl.classList.add('plugin-space-message');
-    messageEl.textContent = config.message;
-    headingEl.classList.add('plugin-space-heading');
-    headingEl.textContent = 'Hello kintone plugin!';
+    // messageEl.classList.add('plugin-space-message');
+    // messageEl.textContent = config.message;
+    // headingEl.classList.add('plugin-space-heading');
+    // headingEl.textContent = 'Hello kintone plugin!';
 
-    fragment.appendChild(headingEl);
-    fragment.appendChild(messageEl);
-    spaceElement.appendChild(fragment);
+    // fragment.appendChild(headingEl);
+    // fragment.appendChild(messageEl);
+    // spaceElement.appendChild(fragment);
   });
 
   kintone.events.on('app.record.create.submit.success', function(event){
@@ -30,37 +30,24 @@ jQuery.noConflict();
     console.log(record);
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
     
-    var field = JSON.parse(config.mapping);
+    var field = JSON.parse(config.fieldinfos);
     
     var recordsFields = {};
 
-    recordsFields['id'] = {'value': kintone.app.getId().toString() + record['$id']['value'].toString()}
-    recordsFields['status'] = {'value': "IN"}
-    recordsFields['app_id'] = {'value': kintone.app.getId()}
-    recordsFields['ref_record_no'] = {'value': record['$id']['value']}
+    recordsFields[config.uniqueField] = {'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')}
+    recordsFields['io_type'] = {'value': "IN"}
     field.forEach(element => {
-      console.log(record[element.from]);
-      if(record[element.from] !== undefined){
-        recordsFields[element.to] = {
-          'value' : record[element.from]['value']
+        recordsFields[element.target] = {
+          'value' : element['source']['type']=='select' ? record[element['source']['value']]['value'] : element['source']['value']
         };
-      }
     });
-
-    var body = {
-      'app': config.destID,
-      'record': recordsFields
-    };
-
-    console.log(body)
     
-    kintone.api(kintone.api.url('/k/v1/record', true), 'POST', body, function(resp) {
-      // success
+    kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
+      'app': config.targetID,
+      'record': recordsFields
+    }, function(resp) {
       console.log(resp);
-    }, function(error) {
-      // error
-      console.log(error);
-    });
+    }, function(error) { });
 
   });
 
@@ -68,27 +55,23 @@ jQuery.noConflict();
     var record = event.record;
     console.log(record);
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
-    
-    var field = JSON.parse(config.mapping);
+    console.log(config)
+    var field = JSON.parse(config.fieldinfos);
     
     var recordsFields = {};
 
-    recordsFields['status'] = {'value': "Adjustment"}
-    recordsFields['app_id'] = {'value': kintone.app.getId()}
+    recordsFields['io_type'] = {'value': "Adjustment"}
     field.forEach(element => {
-      console.log(record[element.from]);
-      if(record[element.from] !== undefined){
-        recordsFields[element.to] = {
-          'value' : record[element.from]['value']
-        };
-      }
+      recordsFields[element.target] = {
+        'value' : element['source']['type']=='select' ? record[element['source']['value']]['value'] : element['source']['value']
+      };
     });
 
     var body = {
-      'app': config.destID,
+      'app': config.targetID,
       'updateKey': {
-        'field': 'id',
-        'value': kintone.app.getId().toString() + record['$id']['value'].toString()
+        'field': config.uniqueField,
+        'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')
       },
       'record': recordsFields
     };
@@ -98,10 +81,7 @@ jQuery.noConflict();
     kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body, function(resp) {
       // success
       console.log(resp);
-    }, function(error) {
-      // error
-      console.log(error);
-    });
+    }, function(error) { });
 
   });
 
@@ -110,26 +90,22 @@ jQuery.noConflict();
     console.log(record);
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
     
-    var field = JSON.parse(config.mapping);
+    var field = JSON.parse(config.fieldinfos);
     
     var recordsFields = {};
 
-    recordsFields['status'] = {'value': "OUT"}
-    recordsFields['app_id'] = {'value': kintone.app.getId()}
+    recordsFields['io_type'] = {'value': "OUT"}
     field.forEach(element => {
-      console.log(record[element.from]);
-      if(record[element.from] !== undefined){
-        recordsFields[element.to] = {
-          'value' : record[element.from]['value']
-        };
-      }
+      recordsFields[element.target] = {
+        'value' : element['source']['type']=='select' ? record[element['source']['value']]['value'] : element['source']['value']
+      };
     });
 
     var body = {
-      'app': config.destID,
+      'app': config.targetID,
       'updateKey': {
-        'field': 'id',
-        'value': kintone.app.getId().toString() + record['$id']['value'].toString()
+        'field': config.uniqueField,
+        'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')
       },
       'record': recordsFields
     };
@@ -139,10 +115,7 @@ jQuery.noConflict();
     kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body, function(resp) {
       // success
       console.log(resp);
-    }, function(error) {
-      // error
-      console.log(error);
-    });
+    }, function(error) { });
 
   });
 

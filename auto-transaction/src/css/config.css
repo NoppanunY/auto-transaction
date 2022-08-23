@@ -5,3 +5,17 @@
 .kintoneplugin-input-text {
   width: 20em;
 }
+
+.unique-message{
+  color: rgb(252, 32, 32);
+}
+
+.kintoneplugin-row.row-al-cen{
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.kintoneplugin-button-remove-row-image.hidden{
+  display: none;
+}
