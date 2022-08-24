@@ -10,7 +10,7 @@ jQuery.noConflict();
 
   // Template Html
   const htmlTable = (tableBody) => `
-  <p class="kintoneplugin-desc">Set mapping fields</p>
+    <p class="kintoneplugin-desc">Set mapping fields</p>
     <table class="kintoneplugin-table">
       <thead>
         <tr>
@@ -26,7 +26,7 @@ jQuery.noConflict();
     </table>
   `;
   
-  const htmlTableRow = (sourceOption, targetOption) => `
+  const htmlTableRow = (sourceOptions, targetOptions) => `
     <tr>
 
       <td class="target-field">
@@ -36,7 +36,7 @@ jQuery.noConflict();
               <div class="kintoneplugin-select target-field">
                 <select name="target-field">
                   <option value="null" selected hidden></option>
-                  ${targetOption}
+                  ${targetOptions}
                 </select>
               </div>
             </div>
@@ -66,7 +66,7 @@ jQuery.noConflict();
               <div class="kintoneplugin-select source-field">
                 <select name="source-field">
                   <option value="null" selected hidden></option>
-                  ${sourceOption}
+                  ${sourceOptions}
                 </select>
               </div>
             </div>
@@ -81,16 +81,22 @@ jQuery.noConflict();
     </tr>
   `;
 
-  const htmlUniqueSection = (option) => `
+  const htmlUniqueSection = (options) => `
     <span>Save Reference Record ID to :&nbsp;</span> 
     <div class="kintoneplugin-select-outer">
       <div class="kintoneplugin-select unique-field">
         <select name="unique-field">
           <option value="null" selected hidden></option>
-          ${option}
+          ${options}
         </select>
       </div>
     </div>
+  `;
+
+  const htmlOptionGroup = (groupName, options) => `
+    <optgroup label="${groupName}">
+      ${options}
+    </optgroup>
   `;
 
   var htmlTargetOption = "";
@@ -123,9 +129,11 @@ jQuery.noConflict();
       })
       if (config.targetID) {
         $('select[name="target-app"]').val(config.targetID).change();
+        $('select[name="unique-field"]').val(config.uniqueField).change();  
       }
     }, function(error){});
 
+    let optionGroup = [];
     // Load source fields
     kintone.api(kintone.api.url('/k/v1/app/form/fields', true), 'GET', {
       'app': AppID
@@ -142,12 +150,29 @@ jQuery.noConflict();
           case 'STATUS_ASSIGNEE':
           case 'UPDATED_TIME':
           case 'RECORD_NUMBER':
-          case 'SUBTABLE':
             break;
+          case 'SUBTABLE':
+            console.log(values);
+            optionGroup.push({
+              'label': values.label,
+              'value': values.code,
+              'options': ((fields, group) => {
+                let str = "";
+                for (const [key, value] of Object.entries(fields)) {
+                  str += `<option value="${value.code}" group="${group}">${value.label}</option>`;
+                }
+                return str;
+              })(values.fields, values.code)
+            });
+
           default :
-            htmlSourceOption += `<option value="${values.code}">${values.label}</option>`;          
+            htmlSourceOption += `<option value="${values.code}">${values.label}</option>`;
         }
       })
+
+      optionGroup.forEach(element => {
+        htmlSourceOption += htmlOptionGroup(element.label, element.options)
+      });
     }, function(error) {});
   });
 
@@ -206,6 +231,10 @@ jQuery.noConflict();
         $('.mapping-table').empty();
 
         $('.unique-field').html(htmlUniqueSection(htmlUniqueOption));
+        let config = kintone.plugin.app.getConfig(PLUGIN_ID);
+        if (config.uniqueField) {
+          $('select[name="unique-field"]').val(config.uniqueField).change();  
+        }
       }else{
         $('.unique-message').html('* The target app must have unique fields.');
         $('.mapping-table').empty();
@@ -214,23 +243,30 @@ jQuery.noConflict();
     }, function(error) {});
   });
 
-  $('.js-submit-settings').on('change', 'select[name="unique-field"]', function(){
-    
-    $('.mapping-table').append(htmlTable(htmlTableRow(htmlSourceOption, htmlTargetOption, 1)));
-    
-    $('.kintoneplugin-button-remove-row-image').addClass('hidden');
-    // if('fieldinfos' in config){
-    //   $('.mapping-table tbody tr').each(function(){
-    //     var td = $($(this).find('td')[0]).find('input[name="source-field"]').attr('id');
-        
-    //     (JSON.parse(config.fieldinfos)).forEach(element => {
-    //       if(element.from == td){
-    //         $($(this).find('td')[1]).find('select[name="target-field"]').val(element.to).change();
-    //       } 
-    //     });
-
-    //   })
-    // }
+  $('.js-submit-settings').on('change', 'select[name="unique-field"]', function(){  
+    let config = kintone.plugin.app.getConfig(PLUGIN_ID);
+    if('fieldinfos' in config){
+      let fields = JSON.parse(config.fieldinfos);      
+      if(fields.length > 0){
+        $('.mapping-table').append(htmlTable(""));
+        (JSON.parse(config.fieldinfos)).forEach(element => {
+          console.log(element);
+          $('.mapping-table tbody').append(htmlTableRow(htmlSourceOption, htmlTargetOption))
+          $('.mapping-table tr:last').find('[name="target-field"]').val(element.target.value).change();
+          if(element.source.type == 'subtable'){
+            console.log(element);
+            $('.mapping-table tr:last').find('[name="data-type"]').val(element.source.value.type).change();
+            $('.mapping-table tr:last').find('[name="source-field"]').val(element.source.value.value).change();
+          }else{
+            $('.mapping-table tr:last').find('[name="data-type"]').val(element.source.type).change();
+            $('.mapping-table tr:last').find('[name="source-field"]').val(element.source.value).change();
+          }
+        });
+      }else{
+        $('.mapping-table').append(htmlTable(htmlTableRow(htmlSourceOption, htmlTargetOption)));
+        $('.kintoneplugin-button-remove-row-image').addClass('hidden');
+      }      
+    }
   });
 
   $('.mapping-table').on('change', 'select[name="target-field"]', function(e){
@@ -281,38 +317,99 @@ jQuery.noConflict();
   });
 
   $form.on('submit', function(e) {
+    let hasSubtable = false;
+
     e.preventDefault();
-    console.log(targetID);
-    console.log($('select[name="unique-field"]').val());
+    // console.log(targetID);
+    // console.log($('select[name="unique-field"]').val());
     fieldinfos = [];
     $('.mapping-table tbody tr').each(function(){
-      console.log($(this).find('[name="source-field"]').val());
-      console.log($(this).find('[name="target-field"]').val());
-      console.log($(this).find('[name="data-type"]').val());
-      if($(this).find('[name="source-field"]').val() == 'null' || $(this).find('[name="target-field"]').val() == 'null' || $(this).find('[name="source-field"]').val() == ''){
+      // console.log($(this).find('[name="source-field"]').val());
+      // console.log($(this).find('[name="target-field"]').val());
+      // console.log($(this).find('[name="data-type"]').val());
+      let element = {
+        'target' : {
+          'select': $(this).find('[name="target-field"]')
+        },
+        'source' : {
+          'select': $(this).find('[name="source-field"]'),
+          'selected': $($(this).find('[name="source-field"]')[0]).find(':selected')
+        },
+        'dataType' : {
+          'select': $(this).find('[name="data-type"]')
+        },
+      }
+
+      if( element['source']['select'].val() == 'null' || element['target']['select'].val() == 'null' || element['target']['select'].val() == ''){
         alert('Can\'t set field be null');
         return;
       }
 
-      fieldinfos.push({
-        'source': {
-          'type': $(this).find('[name="data-type"]').val(),
-          'value': $(this).find('[name="source-field"]').val()
-        },
-        'target': $(this).find('[name="target-field"]').val(),
-        
-      })
+      fieldinfos.push({'source': {},'target': {}});
+
+      // set target value
+      fieldinfos[fieldinfos.length-1]['target'] = {
+        'type': "",
+        'value': element['target']['select'].val()
+      }
+      
+      // set source value
+      if( element['dataType']['select'].val() == 'select'){
+        if(typeof element['source']['selected'].attr('group') !== 'undefined' && element['source']['selected'].attr('group') !== false){
+          hasSubtable = true;
+          fieldinfos[fieldinfos.length-1]['source'] = {
+            'type': 'subtable',
+            'value': {
+              'type': 'select',
+              'group': element['source']['selected'].attr('group'),
+              'value': element['source']['select'].val()
+            }
+          }
+        }else{
+          fieldinfos[fieldinfos.length-1]['source'] = {
+            'type': 'select',
+            'value': element['source']['select'].val()
+          }
+        }
+      }else if( element['dataType']['select'].val() == 'text'){
+        fieldinfos[fieldinfos.length-1]['source'] = {
+          'type': element['dataType']['select'].val(),
+          'value': element['source']['select'].val()
+        }
+      }
     })
+
     console.log(fieldinfos)
-    kintone.plugin.app.setConfig({
-      'targetID': targetID,
-      'uniqueField': $('select[name="unique-field"]').val(),
-      'fieldinfos': JSON.stringify(fieldinfos, '')
-    }, function() {
-      alert('The plug-in settings have been saved. Please update the app!');
-      window.location.href = '../../flow?app=' + kintone.app.getId();
+
+    let subtableGroup = "";
+    let check = true;
+    fieldinfos.forEach(element => {
+      if(element.source.type == 'subtable'){
+        if(subtableGroup == ""){
+          subtableGroup = element.source.value.group;
+        }else{
+          if(subtableGroup != element.source.value.group){
+            alert('Error! Only one subtable can be used.');
+            check = false;
+            return;
+          }
+        }
+      }
     });
+
+    if(check){
+      kintone.plugin.app.setConfig({
+        'targetID': targetID,
+        'uniqueField': $('select[name="unique-field"]').val(),
+        'hasSubtable': hasSubtable.toString(),
+        'fieldinfos': JSON.stringify(fieldinfos, '')
+      }, function() {
+        alert('The plug-in settings have been saved. Please update the app!');
+        window.location.href = '../../flow?app=' + kintone.app.getId();
+      });
+    }
   });
+  
   $cancelButton.on('click', function() {
     window.location.href = '../../' + kintone.app.getId() + '/plugin/';
   });

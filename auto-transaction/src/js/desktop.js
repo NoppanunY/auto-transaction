@@ -3,6 +3,8 @@ jQuery.noConflict();
 (function($, PLUGIN_ID) {
   'use strict';
 
+  var old_subtable = [];
+
   kintone.events.on('app.record.index.show', function() {
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
     console.log(config);
@@ -29,93 +31,236 @@ jQuery.noConflict();
     var record = event.record;
     console.log(record);
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
-    
-    var field = JSON.parse(config.fieldinfos);
-    
+    console.log(config);
+
+    var json = JSON.parse(config.fieldinfos);
+    console.log(json)
+
+    var records = [];
     var recordsFields = {};
+
+    // recordsFields['io_type'] = {'value': "IN"}
+    
+    let subtableGroup = "";
 
     recordsFields[config.uniqueField] = {'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')}
-    recordsFields['io_type'] = {'value': "IN"}
-    field.forEach(element => {
-        recordsFields[element.target] = {
-          'value' : element['source']['type']=='select' ? record[element['source']['value']]['value'] : element['source']['value']
-        };
-    });
-    
-    kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
-      'app': config.targetID,
-      'record': recordsFields
-    }, function(resp) {
-      console.log(resp);
-    }, function(error) { });
-
-  });
-
-  kintone.events.on('app.record.edit.submit.success', function(event){
-    var record = event.record;
-    console.log(record);
-    var config = kintone.plugin.app.getConfig(PLUGIN_ID);
-    console.log(config)
-    var field = JSON.parse(config.fieldinfos);
-    
-    var recordsFields = {};
-
-    recordsFields['io_type'] = {'value': "Adjustment"}
-    field.forEach(element => {
-      recordsFields[element.target] = {
+    // recordsFields['io_type'] = {'value': "IN"}
+    json.forEach(element => {
+      if(element['source']['type'] == 'subtable'){
+        subtableGroup = element['source']['value']['group'];
+      }
+      recordsFields[element['target']['value']] = {
         'value' : element['source']['type']=='select' ? record[element['source']['value']]['value'] : element['source']['value']
       };
     });
-
-    var body = {
-      'app': config.targetID,
-      'updateKey': {
-        'field': config.uniqueField,
-        'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')
-      },
-      'record': recordsFields
-    };
-
-    console.log(body)
     
-    kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body, function(resp) {
-      // success
-      console.log(resp);
-    }, function(error) { });
+    if(subtableGroup != ""){      
+      record[subtableGroup]['value'].forEach(element => {
+        console.log(element);
+        recordsFields[config.uniqueField] = {
+          'value': kintone.app.getId().toString().padStart(3, '0') + "-" + 
+                   record['$id']['value'].toString().padStart(4, '0') + "-" + 
+                   element['id'].toString().padStart(4, '0')
+        }
+        json.forEach(field => {
+          if(field['source']['type'] == 'subtable'){
+            recordsFields[field['target']['value']] = {
+              'value': element['value'][field['source']['value']['value']]['value']
+            }
+          }
+        });
+        kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
+          'app': config.targetID,
+          'record': recordsFields
+        });
+        // records.push(recordsFields);
+      });
+
+    }else{
+      kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
+        'app': config.targetID,
+        'record': recordsFields
+      });
+      // records.push(recordsFields);
+    }
+
+    console.log(records);
+    // kintone.api(kintone.api.url('/k/v1/records', true), 'POST', {
+    //   'app': config.targetID,
+    //   'records': records
+    // }, function(resp) {
+    //   console.log(resp);
+    // }, function(error) { });
 
   });
+
+  kintone.events.on('app.record.edit.show', function(event){
+    var record = event.record;
+    var config = kintone.plugin.app.getConfig(PLUGIN_ID);
+    let subtableGroup = "";
+    
+    console.log(record);
+
+    if(config.hasSubtable == 'true'){
+      old_subtable = []
+      var json = JSON.parse(config.fieldinfos);
+      json.forEach(element => {
+        if(element['source']['type'] == 'subtable'){
+          subtableGroup = element['source']['value']['group'];
+          // old_subtable.push({
+          //   'group': element['source']['value']['group'],
+          //   'value': element['source']['value']['value']
+          // })
+        }
+      });
+
+      record[subtableGroup]['value'].forEach(element => {
+        let records = {};
+        console.log(element);
+        records['id'] = element['id'];
+        json.forEach(field => {
+          if(field['source']['type'] == 'subtable'){
+            records[field['target']['value']] = {
+              'value': element['value'][field['source']['value']['value']]['value']
+            }
+          }
+        });
+        old_subtable.push({
+          records
+        })
+      });
+    }
+    console.log(old_subtable)
+  });
+
+  kintone.events.on('app.record.edit.submit.success', async function(event){
+    var record = event.record;
+    var config = kintone.plugin.app.getConfig(PLUGIN_ID);
+    var json = JSON.parse(config.fieldinfos);
+    
+    var recordsFields = {};
+    let subtableGroup = "";
+
+    json.forEach(element => {
+      if(element['source']['type'] == 'subtable'){
+        subtableGroup = element['source']['value']['group'];
+      }
+      recordsFields[element['target']['value']] = {
+        'value' : element['source']['type']=='select' ? record[element['source']['value']]['value'] : element['source']['value']
+      };
+    });
+    
+    if(subtableGroup != ""){      
+      old_subtable.forEach(rold => {
+        let isExist = false;
+          record[subtableGroup]['value'].forEach(rnew => {
+            console.log(rnew)
+            console.log(rold)
+            if(rnew['id'] == rold['records']['id']){
+              isExist = true;
+            }
+          });
+          if(!isExist){
+            kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
+              'app': config.targetID,
+              'query': `${config.uniqueField} in ("${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + rold['records']['id'].toString().padStart(4, '0')}")`,
+              'fields': ['$id']
+            }).then((res) => {
+              if(res['records'].length > 0){
+                kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
+                  'app': config.targetID,
+                  'ids': [res['records'][0]['$id']['value']]
+                }).then((delete_res) => {
+                  console.log("Delete", res['records'][0]);
+                });
+              }
+            });   
+          }     
+      })
+
+      record[subtableGroup]['value'].forEach(async (element) => {
+        let recordField = await getRecord(json, element, record);
+        recordField[config.uniqueField] = {
+          'value': kintone.app.getId().toString().padStart(3, '0') + "-" + 
+                   record['$id']['value'].toString().padStart(4, '0') + "-" + 
+                   element['id'].toString().padStart(4, '0')
+        }
+        
+        kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
+          'app': config.targetID,
+          'query': `${config.uniqueField} in ("${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')}")`,
+          'fields': ['$id']
+        }).then((resp) => {
+          console.log(resp);
+          if(resp['records'].length == 0){
+            kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
+              'app': config.targetID,
+              'record': recordField
+            });
+          }else{
+            delete recordField['ref_rec_num'];
+            kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
+              'app': config.targetID,
+              'updateKey': {
+                'field': config.uniqueField,
+                'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')
+              },
+              'record': recordField
+            });
+          }
+        });  
+      });
+
+    }else{
+      kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
+        'app': config.targetID,
+        'updateKey': {
+          'field': config.uniqueField,
+          'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')
+        },
+        'record': recordsFields
+      });
+    }
+  });
+
+  function getRecord(json, element, record){
+    let recordsFields = {};
+    return new Promise((resolve) => {
+      json.forEach(field => {
+        if(field['source']['type'] == 'subtable'){
+          recordsFields[field['target']['value']] = {
+            'value': element['value'][field['source']['value']['value']]['value']
+          }
+        }else{
+          recordsFields[field['target']['value']] = {
+            'value' : field['source']['type']=='select' ? record[field['source']['value']]['value'] : field['source']['value']
+          };
+        }
+      });
+
+      resolve(recordsFields);
+    })
+  }
 
   kintone.events.on('app.record.detail.delete.submit', function(event){
     var record = event.record;
-    console.log(record);
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
+    var json = JSON.parse(config.fieldinfos);
     
-    var field = JSON.parse(config.fieldinfos);
-    
-    var recordsFields = {};
-
-    recordsFields['io_type'] = {'value': "OUT"}
-    field.forEach(element => {
-      recordsFields[element.target] = {
-        'value' : element['source']['type']=='select' ? record[element['source']['value']]['value'] : element['source']['value']
-      };
+    var query = `${config.uniqueField} like "${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')}"`;
+    kintone.api(kintone.api.url('/k/v1/records', true) + '?app=164&query=' + query, 'GET', {}, function(resp) {
+      console.log(resp)
+      if(resp['records'].length > 0){
+        resp.records.forEach(element => {
+          kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
+            'app': config.targetID,
+            'ids': [element['$id']['value']]
+          }).then((delete_res) => {
+            console.log("Delete", element['$id']['value']);
+          });
+        })
+      }
     });
-
-    var body = {
-      'app': config.targetID,
-      'updateKey': {
-        'field': config.uniqueField,
-        'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')
-      },
-      'record': recordsFields
-    };
-
-    console.log(body)
-    
-    kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body, function(resp) {
-      // success
-      console.log(resp);
-    }, function(error) { });
 
   });
 
