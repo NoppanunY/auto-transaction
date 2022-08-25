@@ -114,7 +114,7 @@ jQuery.noConflict();
   
   var fieldinfos = [];
   var targetID = "";
-
+  
   $(document).ready(function(){
     /*---------------------------------------------------------------
     initialize fields
@@ -131,7 +131,7 @@ jQuery.noConflict();
         $('select[name="target-app"]').val(config.targetID).change();
         $('select[name="unique-field"]').val(config.uniqueField).change();  
       }
-    }, function(error){});
+    });
 
     let optionGroup = [];
     // Load source fields
@@ -173,7 +173,7 @@ jQuery.noConflict();
       optionGroup.forEach(element => {
         htmlSourceOption += htmlOptionGroup(element.label, element.options)
       });
-    }, function(error) {});
+    });
   });
 
   /*---------------------------------------------------------------
@@ -182,10 +182,10 @@ jQuery.noConflict();
   // reload target fields
   $('select[name="target-app"]').on('change', function(){
 
-    var table = "";
     var isExistUnique = false;
     targetID = $('select[name="target-app"]').find(':selected').val();
-    
+    let config = kintone.plugin.app.getConfig(PLUGIN_ID);
+
     htmlTargetOption = "";
     htmlUniqueOption = "";
     kintone.api(kintone.api.url('/k/v1/app/form/fields', true), 'GET', {
@@ -229,10 +229,9 @@ jQuery.noConflict();
       if(isExistUnique){
         $('.unique-message').html("");
         $('.mapping-table').empty();
-
+        
         $('.unique-field').html(htmlUniqueSection(htmlUniqueOption));
-        let config = kintone.plugin.app.getConfig(PLUGIN_ID);
-        if (config.uniqueField) {
+        if (config.uniqueField && targetID == config.targetID) {
           $('select[name="unique-field"]').val(config.uniqueField).change();  
         }
       }else{
@@ -243,29 +242,35 @@ jQuery.noConflict();
     }, function(error) {});
   });
 
-  $('.js-submit-settings').on('change', 'select[name="unique-field"]', function(){  
+  $('.js-submit-settings').on('change', 'select[name="unique-field"]', function(e){  
     let config = kintone.plugin.app.getConfig(PLUGIN_ID);
-    if('fieldinfos' in config){
-      let fields = JSON.parse(config.fieldinfos);      
-      if(fields.length > 0){
-        $('.mapping-table').append(htmlTable(""));
-        (JSON.parse(config.fieldinfos)).forEach(element => {
-          console.log(element);
-          $('.mapping-table tbody').append(htmlTableRow(htmlSourceOption, htmlTargetOption))
-          $('.mapping-table tr:last').find('[name="target-field"]').val(element.target.value).change();
-          if(element.source.type == 'subtable'){
+    $('.mapping-table').empty();
+    if(config.uniqueField != $('select[name="unique-field"]').val()){
+      $('.mapping-table').append(htmlTable(htmlTableRow(htmlSourceOption, htmlTargetOption)));
+      $('.kintoneplugin-button-remove-row-image').addClass('hidden');
+    }else{
+      if('fieldinfos' in config){
+        let fields = JSON.parse(config.fieldinfos);      
+        if(fields.length > 0){
+          $('.mapping-table').append(htmlTable(""));
+          (JSON.parse(config.fieldinfos)).forEach(element => {
             console.log(element);
-            $('.mapping-table tr:last').find('[name="data-type"]').val(element.source.value.type).change();
-            $('.mapping-table tr:last').find('[name="source-field"]').val(element.source.value.value).change();
-          }else{
-            $('.mapping-table tr:last').find('[name="data-type"]').val(element.source.type).change();
-            $('.mapping-table tr:last').find('[name="source-field"]').val(element.source.value).change();
-          }
-        });
-      }else{
-        $('.mapping-table').append(htmlTable(htmlTableRow(htmlSourceOption, htmlTargetOption)));
-        $('.kintoneplugin-button-remove-row-image').addClass('hidden');
-      }      
+            $('.mapping-table tbody').append(htmlTableRow(htmlSourceOption, htmlTargetOption))
+            $('.mapping-table tr:last').find('[name="target-field"]').val(element.target.value).change();
+            if(element.source.type == 'subtable'){
+              console.log(element);
+              $('.mapping-table tr:last').find('[name="data-type"]').val(element.source.value.type).change();
+              $('.mapping-table tr:last').find('[name="source-field"]').val(element.source.value.value).change();
+            }else{
+              $('.mapping-table tr:last').find('[name="data-type"]').val(element.source.type).change();
+              $('.mapping-table tr:last').find('[name="source-field"]').val(element.source.value).change();
+            }
+          });
+        }else{
+          $('.mapping-table').append(htmlTable(htmlTableRow(htmlSourceOption, htmlTargetOption)));
+          $('.kintoneplugin-button-remove-row-image').addClass('hidden');
+        }      
+      }
     }
   });
 
