@@ -13,18 +13,6 @@ jQuery.noConflict();
     if (spaceElement === null) {
       throw new Error('The header element is unavailable on this page');
     }
-    // var fragment = document.createDocumentFragment();
-    // var headingEl = document.createElement('h3');
-    // var messageEl = document.createElement('p');
-
-    // messageEl.classList.add('plugin-space-message');
-    // messageEl.textContent = config.message;
-    // headingEl.classList.add('plugin-space-heading');
-    // headingEl.textContent = 'Hello kintone plugin!';
-
-    // fragment.appendChild(headingEl);
-    // fragment.appendChild(messageEl);
-    // spaceElement.appendChild(fragment);
   });
 
   kintone.events.on('app.record.create.submit.success', function(event){
@@ -72,8 +60,7 @@ jQuery.noConflict();
         kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
           'app': config.targetID,
           'record': recordsFields
-        });
-        // records.push(recordsFields);
+        }, function(resp) { console.log(resp) }, function(error) { console.log(error) });
       });
 
     }else{
@@ -81,17 +68,7 @@ jQuery.noConflict();
         'app': config.targetID,
         'record': recordsFields
       });
-      // records.push(recordsFields);
     }
-
-    console.log(records);
-    // kintone.api(kintone.api.url('/k/v1/records', true), 'POST', {
-    //   'app': config.targetID,
-    //   'records': records
-    // }, function(resp) {
-    //   console.log(resp);
-    // }, function(error) { });
-
   });
 
   kintone.events.on('app.record.edit.show', function(event){
