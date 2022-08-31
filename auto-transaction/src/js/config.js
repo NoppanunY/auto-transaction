@@ -26,6 +26,74 @@ jQuery.noConflict();
     </table>
   `;
   
+  const htmlCondTable = (tableBody) => `
+    <p class="kintoneplugin-desc">Set Condition</p>
+    <table class="kintoneplugin-table">
+      <thead>
+        <tr>
+          <th class="kintoneplugin-table-th"><span class="title">Field</span></th>
+          <th class="kintoneplugin-table-th"><span class="title">Operator</span></th>
+          <th class="kintoneplugin-table-th"><span class="title">Condition</span></th>
+          <th class="kintoneplugin-table-th-blankspace cond"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableBody}
+      </tbody>
+    </table>
+  `;
+
+  const htmlCondTableRow = (sourceOptions, targetOptions) => `
+    <tr>
+      <td class="cond-field">
+        <div class="kintoneplugin-table-td-control">
+          <div class="kintoneplugin-table-td-control-value">
+            <div class="kintoneplugin-select-outer">
+              <div class="kintoneplugin-select cond-field">
+                <select name="cond-field">
+                  <option value="null" selected></option>
+                  ${sourceOptions}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </td>
+      
+      <td class="operator">
+        <div class="kintoneplugin-table-td-control">
+          <div class="kintoneplugin-table-td-control-value">
+            <div class="kintoneplugin-select-outer">
+              <div class="kintoneplugin-select operator">
+                <select name="operator">
+                  <option value="=" selected>=</option>
+                  <option value="<>"><></option>
+                  <option value=">=">>=</option>
+                  <option value="<="><=</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </td>
+
+      <td class="cond-value">
+        <div class="kintoneplugin-table-td-control">
+          <div class="kintoneplugin-table-td-control-value">
+            <div class="kintoneplugin-input-outer">
+              <input class="kintoneplugin-input-text" name="cond-value" type="text" />
+            </div>
+          </div>
+        </div>
+      </td>
+
+      <td class="kintoneplugin-table-td-operation">
+        <button type="button" class="kintoneplugin-button-add-row-image cond" title="Add row"></button>
+        <button type="button" class="kintoneplugin-button-remove-row-image cond" title="Delete this row"></button>
+      </td>
+    </tr>
+  `;
+
   const htmlTableRow = (sourceOptions, targetOptions) => `
     <tr>
 
@@ -101,6 +169,7 @@ jQuery.noConflict();
 
   var htmlTargetOption = "";
   var htmlUniqueOption = "";
+  var htmlCondOption = "";
   
   var htmlSourceOption = "";
 
@@ -135,10 +204,12 @@ jQuery.noConflict();
 
     let optionGroup = [];
     // Load source fields
+    htmlCondOption = "";
     kintone.api(kintone.api.url('/k/v1/app/form/fields', true), 'GET', {
       'app': AppID
     }, function(resp) {
       $.each(resp.properties, function(index, values){
+        console.log(values)
         switch(values.type){
           case 'CATEGORY':
           case 'CREATED_TIME':
@@ -146,10 +217,12 @@ jQuery.noConflict();
           case 'FILE':
           case 'MODIFIER':
           case 'REFERENCE_TABLE':
-          case 'STATUS':
           case 'STATUS_ASSIGNEE':
           case 'UPDATED_TIME':
           case 'RECORD_NUMBER':
+            break;
+          case 'STATUS':
+            htmlCondOption += `<option value="${values.code}">${values.label}</option>`;
             break;
           case 'SUBTABLE':
             console.log(values);
@@ -167,6 +240,8 @@ jQuery.noConflict();
 
           default :
             htmlSourceOption += `<option value="${values.code}">${values.label}</option>`;
+            if(values.type != "DATE")
+              htmlCondOption += `<option value="${values.code}">${values.label}</option>`;
         }
       })
 
@@ -228,6 +303,7 @@ jQuery.noConflict();
 
       if(isExistUnique){
         $('.unique-message').html("");
+        $('.cond-table').empty();
         $('.mapping-table').empty();
         
         $('.unique-field').html(htmlUniqueSection(htmlUniqueOption));
@@ -236,8 +312,9 @@ jQuery.noConflict();
         }
       }else{
         $('.unique-message').html('* The target app must have unique fields.');
-        $('.mapping-table').empty();
         $('.unique-field').empty();
+        $('.cond-table').empty();
+        $('.mapping-table').empty();
       }
     }, function(error) {});
   });
@@ -245,7 +322,9 @@ jQuery.noConflict();
   $('.js-submit-settings').on('change', 'select[name="unique-field"]', function(e){  
     let config = kintone.plugin.app.getConfig(PLUGIN_ID);
     $('.mapping-table').empty();
+    $('.cond-table').empty();
     if(config.uniqueField != $('select[name="unique-field"]').val()){
+      $('.cond-table').append(htmlCondTable(htmlCondTableRow(htmlCondOption)));
       $('.mapping-table').append(htmlTable(htmlTableRow(htmlSourceOption, htmlTargetOption)));
       $('.kintoneplugin-button-remove-row-image').addClass('hidden');
     }else{
@@ -254,11 +333,11 @@ jQuery.noConflict();
         if(fields.length > 0){
           $('.mapping-table').append(htmlTable(""));
           (JSON.parse(config.fieldinfos)).forEach(element => {
-            console.log(element);
+            // console.log(element);
             $('.mapping-table tbody').append(htmlTableRow(htmlSourceOption, htmlTargetOption))
             $('.mapping-table tr:last').find('[name="target-field"]').val(element.target.value).change();
             if(element.source.type == 'subtable'){
-              console.log(element);
+              // console.log(element);
               $('.mapping-table tr:last').find('[name="data-type"]').val(element.source.value.type).change();
               $('.mapping-table tr:last').find('[name="source-field"]').val(element.source.value.value).change();
             }else{
@@ -271,19 +350,28 @@ jQuery.noConflict();
           $('.kintoneplugin-button-remove-row-image').addClass('hidden');
         }      
       }
+      if('conditions' in config){
+        let fields = JSON.parse(config.conditions);      
+        if(fields.length > 0){
+          $('.cond-table').append(htmlCondTable(""));
+          (JSON.parse(config.conditions)).forEach(element => {
+            // console.log(element);
+            $('.cond-table tbody').append(htmlCondTableRow(htmlCondOption))
+            $('.cond-table tr:last').find('[name="cond-field"]').val(element.field).change();
+            
+            $('.cond-table tr:last').find('[name="operator"]').val(element.operator).change();
+            $('.cond-table tr:last').find('[name="cond-value"]').val(element.value).change();
+          });
+        }else{
+          $('.cond-table').append(htmlCondTable(htmlCondTableRow(htmlCondOption)));
+          $('.kintoneplugin-button-remove-row-image.cond').addClass('hidden-cond');
+        }  
+      }else{
+        $('.cond-table').append(htmlCondTable(htmlCondTableRow(htmlCondOption)));
+        $('.kintoneplugin-button-remove-row-image.cond').addClass('hidden-cond');
+      }
     }
   });
-
-  $('.mapping-table').on('change', 'select[name="target-field"]', function(e){
-    // var to = $(this).closest('tr').find('input[name="source-field"]').attr('id');
-    // var from = $(this).find(':selected')[0].value;
-    // for(var i=0; i<fieldinfos.length; i++){
-    //   if(fieldinfos[i].to == to){
-    //     fieldinfos[i].from = from;
-    //   }
-    // }
-  })
-
 
   $('.mapping-table').on('click', '.kintoneplugin-button-add-row-image', function(){
     $(this).closest('tr').after(htmlTableRow(htmlSourceOption, htmlTargetOption));
@@ -298,9 +386,22 @@ jQuery.noConflict();
     $(this).closest('tr').remove();
   })
 
+  $('.cond-table').on('click', '.kintoneplugin-button-add-row-image.cond', function(){
+    $(this).closest('tr').after(htmlCondTableRow(htmlCondOption));
+    $('.kintoneplugin-button-remove-row-image.cond').removeClass('hidden');
+  })
+  
+  $('.cond-table').on('click', '.kintoneplugin-button-remove-row-image.cond', function(){
+    var rowCount = $(this).closest('tbody').find('tr').length;
+    if(rowCount == 2){
+      $('.kintoneplugin-button-remove-row-image.cond').addClass('hidden');
+    }
+    $(this).closest('tr').remove();
+  })
+
   $('.mapping-table').on('change', 'select[name="data-type"]', function(){
     let type = $('option:selected', this).attr('value');
-    console.log(type);
+    // console.log(type);
     if(type == 'select'){
       $($(this).closest('tr').find('.source-field .kintoneplugin-table-td-control-value')[0]).html(`
         <div class="kintoneplugin-select-outer">
@@ -328,10 +429,40 @@ jQuery.noConflict();
     // console.log(targetID);
     // console.log($('select[name="unique-field"]').val());
     fieldinfos = [];
+    var conditions = [];
+    let check = true;
+
+    $('.cond-table tbody tr').each(function(){
+      // console.log($(this).find('[name="source-field"]').val());
+      // console.log($(this).find('[name="target-field"]').val());
+      // console.log($(this).find('[name="data-type"]').val());
+      let element = {
+        'field' : $(this).find('[name="cond-field"]'),
+        'operator' : $(this).find('[name="operator"]'),
+        'value' :  $(this).find('[name="cond-value"]'),
+      }
+
+      console.log($(this).closest('tbody').find('tr').length)
+
+      if($(this).closest('tbody').find('tr').length > 1 && check){
+        if( element['field'].val() == 'null' || element['operator'].val() == 'null' || element['value'].val() == ''){
+          alert('Cond can\'t set field be null');
+          check = false;
+          return;
+        }
+      }
+
+      conditions.push({
+        'field': element['field'].val(), 
+        'operator': element['operator'].val(), 
+        'value': element['value'].val()});
+    })
+
     $('.mapping-table tbody tr').each(function(){
       // console.log($(this).find('[name="source-field"]').val());
       // console.log($(this).find('[name="target-field"]').val());
       // console.log($(this).find('[name="data-type"]').val());
+
       let element = {
         'target' : {
           'select': $(this).find('[name="target-field"]')
@@ -344,7 +475,7 @@ jQuery.noConflict();
           'select': $(this).find('[name="data-type"]')
         },
       }
-
+      
       if( element['source']['select'].val() == 'null' || element['target']['select'].val() == 'null' || element['target']['select'].val() == ''){
         alert('Can\'t set field be null');
         return;
@@ -385,9 +516,9 @@ jQuery.noConflict();
     })
 
     console.log(fieldinfos)
+    console.log(conditions)
 
     let subtableGroup = "";
-    let check = true;
     fieldinfos.forEach(element => {
       if(element.source.type == 'subtable'){
         if(subtableGroup == ""){
@@ -407,7 +538,8 @@ jQuery.noConflict();
         'targetID': targetID,
         'uniqueField': $('select[name="unique-field"]').val(),
         'hasSubtable': hasSubtable.toString(),
-        'fieldinfos': JSON.stringify(fieldinfos, '')
+        'fieldinfos': JSON.stringify(fieldinfos, ''),
+        'conditions': JSON.stringify(conditions, '')
       }, function() {
         alert('The plug-in settings have been saved. Please update the app!');
         window.location.href = '../../flow?app=' + kintone.app.getId();

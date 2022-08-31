@@ -16,6 +16,7 @@
   font-size: 14px;
 }
 
-.kintoneplugin-button-remove-row-image.hidden{
+.kintoneplugin-button-remove-row-image.hidden,
+.kintoneplugin-button-remove-row-image.hidden-cond{
   display: none;
 }
