@@ -2,11 +2,25 @@ jQuery.noConflict();
 
 (function($, PLUGIN_ID) {
   'use strict';
-  luxon.Settings.defaultLocale = 'en-US'; // Sinitialize the locale
 
   // const
   const AppID = kintone.app.getId();
 
+  const cdnRequired = [
+    {
+      'platform': 'desktop',
+      'lang': 'js',
+      'type': 'URL',
+      'url': 'https://js.kintone.com/luxon/3.0.3/luxon.min.js'
+    },
+    {
+      'platform': 'desktop',
+      'lang': 'js',
+      'type': 'URL',
+      'url': 'https://js.kintone.com/jquery/3.6.1/jquery.min.js'
+    },
+  ]
+  
   var old_subtable = [];
 
   var isProceed = false;
@@ -18,6 +32,134 @@ jQuery.noConflict();
     setting: {
       reloaded: false
     }
+  }
+
+  function alertMessage(message) {
+    var alertButtonClose = $('<span class="close"></span>'),
+        alertMessage = $('<div class="kintoneplugin-alert popup"><span>' + message + '</span></div>');
+    alertButtonClose.click(function() {
+        $(this).parents('.kintoneplugin-alert-popup').remove();
+        window.location.href = '/k/admin/app/flow?app=' + kintone.app.getId();
+    });
+    alertMessage.append(alertButtonClose);
+    $('body').append($('<div class="kintoneplugin-alert-popup"></div>').append(alertMessage));
+  }
+
+  /**
+   * กำหนดค่าเริ่มต้น plugin
+  */
+  async function settingPlugin(){    
+    var body = {}
+    var scope = ""
+    let updated = false
+
+    kintone.api(kintone.api.url('/k/v1/app/customize', true), 'GET', {
+      'app': AppID
+    },async function(resp) {
+      
+      body = resp
+      
+      for(let cdn of cdnRequired){
+        let isExist = false
+        for(let item of body[cdn.platform][cdn.lang]){
+          if(item.type == "URL" && cdn.type == item.type){
+            if(cdn.url == item.url) isExist = true
+          }
+        }
+        if(!isExist){
+          let text = `จำเป็นต้องใช้ cdn ${cdn.url}\nยืนยันเพื่อเพิ่มอัติโนมัติ`;
+          if (confirm(text) == true) {
+            text = "You pressed OK!";
+            updated = true
+            body[cdn.platform][cdn.lang].push({
+              'type': cdn.type,
+              'url': cdn.url
+            })
+          } else {
+            alert("เกิดข้อผิดพลาด")
+            return;
+          }
+        }
+      }
+
+      if(!updated){
+        luxon.Settings.defaultLocale = 'en-US'; // Sinitialize the locale
+        return
+      }
+      
+      delete body['revision'];
+      scope = body['scope'];
+      delete body['scope'];
+
+      for(var platform of Object.entries(body)){
+        for(var lang of Object.entries(platform[1])){
+          for(var index in lang[1]){
+            let type = body[platform[0]][lang[0]][index].type;
+
+            if(type != "FILE") continue
+
+            let fileKey = body[platform[0]][lang[0]][index].file.fileKey
+            let fileName = body[platform[0]][lang[0]][index].file.name
+            let newFilekey = await fetchFile(fileKey, fileName)
+
+            body[platform[0]][lang[0]][index].file.fileKey = newFilekey
+
+            delete body[platform[0]][lang[0]][index].file.contentType
+            delete body[platform[0]][lang[0]][index].file.name
+            delete body[platform[0]][lang[0]][index].file.size
+          }
+        }
+      }
+
+      body['app'] = AppID;
+      body['scope'] = scope;
+      
+      kintone.api(kintone.api.url('/k/v1/preview/app/customize', true), 'PUT', resp, function(resp) {
+        alertMessage('The plug-in settings have been saved. Please update the app!');
+      });
+     
+    });
+  }
+
+  /**
+   * key renew
+   * @param {string} fileKey old fileKey
+   * @param {string} fileName file name
+   * @returns new fileKey
+   */
+  function fetchFile(fileKey, fileName){
+    return new Promise((resolve) => {
+        var url = kintone.api.url('/k/v1/file.json', true) + "?fileKey=" + fileKey;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.responseType = 'blob';
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            var blob = new Blob([xhr.response]);
+            var formData = new FormData();
+            formData.append('__REQUEST_TOKEN__', kintone.getRequestToken());
+            formData.append('file', blob, fileName);
+
+            var url = kintone.api.url('/k/v1/file.json', true);
+            var new_xhr = new XMLHttpRequest();
+            new_xhr.open('POST', url);
+            new_xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            new_xhr.onload = function() {
+              if (new_xhr.status === 200) {
+                resolve(JSON.parse(new_xhr.responseText).fileKey)
+              } else {
+                console.log(JSON.parse(new_xhr.responseText));
+              }
+            };
+            new_xhr.send(formData);
+
+          } else {
+            console.log(xhr.responseText);
+          }
+        };
+        xhr.send();   
+    })
   }
 
   function loadFields(ID){
@@ -42,6 +184,10 @@ jQuery.noConflict();
 
   function checkCondition(cond, record){
     let check = false;
+    if(cond.length == 0){
+      check = true
+    }
+
     cond.forEach(element => {
       if(element.field in record){
         switch(element.operator){
@@ -91,7 +237,7 @@ jQuery.noConflict();
     })
   }
   
-  async function updateSummary(config){
+  async function updateSummary(config, ids){
     // console.log(config);
     
     const b1 = performance.now();
@@ -106,6 +252,8 @@ jQuery.noConflict();
       );
     }
     query += period.join(" and ")
+
+    query += ` and $id in (${ids.join(", ")})`
 
     var sourceRecords = await fetch_record(config.app.source, query);
 
@@ -170,43 +318,55 @@ jQuery.noConflict();
           query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
           body['record'][map.target] = {'value' : elm[map.source]['value']}
         }else{
-          query_target.push(`${map.target} = "${luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)}"`);
-          query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
-          
-          body['record'][map.target] = {
-            'value' : luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)
+          if(map.formet == ""){
+            query_target.push(`${map.target} = "${elm[map.source]['value']}"`);
+            // query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
+            
+            body['record'][map.target] = {
+              'value' : elm[map.source]['value']
+            }
+          }else{
+            query_target.push(`${map.target} = "${luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)}"`);
+            // query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
+            
+            body['record'][map.target] = {
+              'value' : luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)
+            }
           }
         }
-        isExist.push(`${map.target} like "${elm[map.source]['value']}"`); 
+        // isExist.push(`${map.target} like "${elm[map.source]['value']}"`); 
       }
 
-      if(!filter.includes(isExist.join(" and "))){
-        // PLUS
-        let query_str = query_source.join(" and ")
-        let foo = []
-        for(const [key, value] of Object.entries(cond.plus)){
-          foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
-        }
-        query_str += " and " + foo.join(" and ")
-        query_str += " and " + period.join(" and ")
+      // PLUS
+      let query_str_plus = query_source.join(" and ")
+      let foo = []
+      for(const [key, value] of Object.entries(cond.plus)){
+        foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+      }
+      query_str_plus += " and " + foo.join(" and ")
+      query_str_plus += " and " + period.join(" and ")
+
+      // MINUS
+      let query_str_minus = query_source.join(" and ")
+      foo = []
+      for(const [key, value] of Object.entries(cond.minus)){
+        foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+      }
+      query_str_minus += " and " + foo.join(" and ")
+      query_str_minus += " and " + period.join(" and ")
+
+      if(!filter.includes(query_str_plus) || !filter.includes(query_str_minus)){
+        
         console.group("Plus")
-        let plus_total = await calc_summary(config.app.source ,query_str , config.summary.source, {'plus': config.plus, 'minus': config.minus});
+        let plus_total = await calc_summary(config.app.source ,query_str_plus , config.summary.source, {'plus': config.plus, 'minus': config.minus});
+        filter.push(query_str_plus)
         console.groupEnd()
 
-        // MINUS
-        query_str = query_source.join(" and ")
-        foo = []
-        for(const [key, value] of Object.entries(cond.minus)){
-          foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
-        }
-        query_str += " and " + foo.join(" and ")
-        query_str += " and " + period.join(" and ")
+        
         console.group("Minus")
-        let minus_total = await calc_summary(config.app.source ,query_str , config.summary.source, {'plus': config.plus, 'minus': config.minus});
+        let minus_total = await calc_summary(config.app.source ,query_str_minus , config.summary.source, {'plus': config.plus, 'minus': config.minus});
+        filter.push(query_str_minus)
         console.groupEnd()
-
-        // console.log(plus_total)
-        // console.log(minus_total)
         
         body['record'][config.summary.target] = {'value' : plus_total-minus_total};
 
@@ -225,11 +385,12 @@ jQuery.noConflict();
           }
         })
 
-        filter.push(isExist.join(" and "))
+        // filter.push(isExist.join(" and "))
         // console.log(filter)
         // console.log(plus_total-minus_total)
       }
     }
+
     const b2 = performance.now();
     console.log(`Time: ${b2 - b1}`);
     console.log("Finish")
@@ -411,13 +572,13 @@ jQuery.noConflict();
     /*---------------------------------------------------------------
     initialize fields
     ---------------------------------------------------------------*/
+    settingPlugin()
+
     vars['source'] = await loadFields(AppID);
   });
 
   kintone.events.on('app.record.index.show', function() {
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
-    // console.log(config);
-    // console.log(JSON.parse(config.fieldinfos));
     console.log(JSON.parse(config.summary));
 
     var spaceElement = kintone.app.getHeaderSpaceElement();
@@ -456,6 +617,7 @@ jQuery.noConflict();
       });
       
       console.group("Create");
+      let ids = []
       if(subtableGroup != ""){
         console.log("Start")
         for(let element of record[subtableGroup]['value']){
@@ -478,6 +640,7 @@ jQuery.noConflict();
               'record': recordsFields
             }, function(resp){
               console.log(resp)
+              ids.push(resp.id)
               resolve(resp)
             }, function(error){
               reject(error)
@@ -486,7 +649,7 @@ jQuery.noConflict();
         }
         console.log("End")
         
-        await updateSummary(JSON.parse(config.summary));
+        await updateSummary(JSON.parse(config.summary), ids);
       }else{
         await new Promise((resolve) => {
           kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {

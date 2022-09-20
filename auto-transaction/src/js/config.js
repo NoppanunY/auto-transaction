@@ -462,9 +462,8 @@ jQuery.noConflict();
   function loadApps(){
     return new Promise((resolve) => {
       let apps = {}
-      kintone.api(kintone.api.url('/k/v1/apps', true), 'GET', {offset:20})
-      .then(async function(resp){
-        for (const app of resp.apps){
+      fetchAllApps().then(function(records){
+        for (const app of records){
           if(app.appId != AppID)
             apps[app.appId] = app
         }
@@ -491,6 +490,35 @@ jQuery.noConflict();
         resolve(fields);
       });
     })
+  }
+
+  function fetchAll(app, query, fields, opt_offset, opt_records) {
+    var offset = opt_offset || 0;
+    var records = opt_records || [];
+    var params = {
+      app: app,
+      query: `${query} limit 100 offset ${offset}`,
+      fields: fields
+    };
+    return kintone.api('/k/v1/records', 'GET', params).then(function(resp) {
+      records = records.concat(resp.records);
+      if (resp.records.length === 100) {
+        return fetchAll(app, query, fields, offset + 100, records);
+      }
+      return records;
+    });
+  }
+
+  function fetchAllApps(opt_offset, opt_records) {
+    var offset = opt_offset || 0;
+    var apps = opt_records || [];
+    return kintone.api('/k/v1/apps', 'GET', {'offset': offset}).then(function(resp) {
+      apps = apps.concat(resp.apps);
+      if (resp.apps.length === 100) {
+        return fetchAllApps(offset + 100, apps);
+      }
+      return apps;
+    });
   }
 
   function getAppOptions(apps){
@@ -600,20 +628,20 @@ jQuery.noConflict();
 
   function reloadField(fields, source, target){
     if(fields.length > 0){
-      $('section#transaction .mapping-table').append(htmlFormat.transaction.table.body(""));
+      $('#transaction .mapping-table').append(htmlFormat.transaction.table.body(""));
       fields.forEach(row => {
-        $('section#transaction .mapping-table tbody').append(htmlFormat.transaction.table.row(getField(source.fieldinfos), getField(target.fieldinfos)))
-        $('section#transaction .mapping-table tr:last').find('[name="target-field"]').val(row.target.value).change();
+        $('#transaction .mapping-table tbody').append(htmlFormat.transaction.table.row(getField(source.fieldinfos), getField(target.fieldinfos)))
+        $('#transaction .mapping-table tr:last').find('[name="target-field"]').val(row.target.value).change();
         if(row.source.type == 'subtable'){
-          $('section#transaction .mapping-table tr:last').find('[name="data-type"]').val(row.source.value.type).change();
-          $('section#transaction .mapping-table tr:last').find('[name="source-field"]').val(row.source.value.value).change();
+          $('#transaction .mapping-table tr:last').find('[name="data-type"]').val(row.source.value.type).change();
+          $('#transaction .mapping-table tr:last').find('[name="source-field"]').val(row.source.value.value).change();
         }else{
-          $('section#transaction .mapping-table tr:last').find('[name="data-type"]').val(row.source.type).change();
-          $('section#transaction .mapping-table tr:last').find('[name="source-field"]').val(row.source.value).change();
+          $('#transaction .mapping-table tr:last').find('[name="data-type"]').val(row.source.type).change();
+          $('#transaction .mapping-table tr:last').find('[name="source-field"]').val(row.source.value).change();
         }
       });
     }else{
-      $('section#transaction .mapping-table').append(htmlFormat.transaction.table.body(htmlFormat.transaction.table.row(getField(vars.source.fieldinfos), getField(vars.target.fieldinfos))));
+      $('#transaction .mapping-table').append(htmlFormat.transaction.table.body(htmlFormat.transaction.table.row(getField(vars.source.fieldinfos), getField(vars.target.fieldinfos))));
       $('.kintoneplugin-button-remove-row-image').addClass('hidden');
     }      
   }
@@ -635,24 +663,24 @@ jQuery.noConflict();
 
   function reloadSummary(summary){
     if(summary.mapping.length > 0){
-      $('section#summary .mapping-table').append(htmlFormat.summary.table.body(""));
+      $('#summary .mapping-table').append(htmlFormat.summary.table.body(""));
       summary.mapping.forEach(row => {
-        $('section#summary .mapping-table tbody').append(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
+        $('#summary .mapping-table tbody').append(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
         
-        $('section#summary .mapping-table tr:last').find('[name="target-field"]').val(row.target).change();
-        $('section#summary .mapping-table tr:last').find('[name="source-field"]').val(row.source).change();
+        $('#summary .mapping-table tr:last').find('[name="target-field"]').val(row.target).change();
+        $('#summary .mapping-table tr:last').find('[name="source-field"]').val(row.source).change();
         
-        console.log(vars.summary.sum.fields.fieldinfos[row.source])
+        // console.log(vars.summary.sum.fields.fieldinfos[row.source])
 
         if(vars.summary.tran.fields.fieldinfos[row.source]['type'] == "DATE"){
-          $('section#summary .mapping-table tr:last').find('[name="format-field"]').val(row.format).change();
+          $('#summary .mapping-table tr:last').find('[name="format-field"]').val(row.format).change();
         }else{
-          $('section#summary .mapping-table tr:last').find('[name="format-field"]').attr('disabled', 'disabled')
+          $('#summary .mapping-table tr:last').find('[name="format-field"]').attr('disabled', 'disabled')
         }
 
       });
     }else{
-      $('section#summary .mapping-table').append(htmlFormat.summary.table.body(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))));
+      $('#summary .mapping-table').append(htmlFormat.summary.table.body(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))));
       $('.checkbox-cond').removeClass('hidden');
     }      
   }
@@ -660,19 +688,19 @@ jQuery.noConflict();
   function reloadPeriod(period){
     // console.log(period)
     if(period.length > 0){
-      $('section#summary .period-table').append(htmlFormat.summary.periodTable.body(""));
+      $('#summary .period-table').append(htmlFormat.summary.periodTable.body(""));
       period.forEach(row => {
-        $('section#summary .period-table tbody').append(htmlFormat.summary.periodTable.row(getField(vars.summary.tran.fields.fieldinfos)))
+        $('#summary .period-table tbody').append(htmlFormat.summary.periodTable.row(getField(vars.summary.tran.fields.fieldinfos)))
         
-        $('section#summary .period-table tr:last').find('[name="source-field"]').val(row.source).change();
-        $('section#summary .period-table tr:last').find('[name="period-field"]').val(row.period).change();
+        $('#summary .period-table tr:last').find('[name="source-field"]').val(row.source).change();
+        $('#summary .period-table tr:last').find('[name="period-field"]').val(row.period).change();
       });
 
       if(period.length == 1){
-        $('section#summary .period-table tr:last').find('.kintoneplugin-button-remove-row-image').hide()
+        $('#summary .period-table tr:last').find('.kintoneplugin-button-remove-row-image').hide()
       }
     }else{
-      $('section#summary .period-table').append(htmlFormat.summary.periodTable.body(htmlFormat.summary.periodTable.row(
+      $('#summary .period-table').append(htmlFormat.summary.periodTable.body(htmlFormat.summary.periodTable.row(
         getField(vars.summary.tran.fields.fieldinfos))));
       $('.checkbox-cond').removeClass('hidden');
     }      
@@ -680,38 +708,38 @@ jQuery.noConflict();
 
   function reloadSummaryPlus(fields){
     if(fields.length > 0){
-      $(`section#summary .plus-table`).append(htmlFormat.summary.plusTable.body(""));
+      $(`#summary .plus-table`).append(htmlFormat.summary.plusTable.body(""));
       fields.forEach(row => {
-        $(`section#summary .plus-table tbody`).append(htmlFormat.summary.plusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
+        $(`#summary .plus-table tbody`).append(htmlFormat.summary.plusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
         
-        $(`section#summary .plus-table tr:last`).find('[name="target-field"]').val(row.target).change();
-        $(`section#summary .plus-table tr:last`).find('[name="cond-value"]').val(row.cond).change();
+        $(`#summary .plus-table tr:last`).find('[name="target-field"]').val(row.target).change();
+        $(`#summary .plus-table tr:last`).find('[name="cond-value"]').val(row.cond).change();
       });
 
       if(fields.length == 1){
-        $('section#summary .plus-table tr:last').find('.kintoneplugin-button-remove-row-image').hide()
+        $('#summary .plus-table tr:last').find('.kintoneplugin-button-remove-row-image').hide()
       }
     }else{
-      $('section#summary .plus-table').append(htmlFormat.summary.plusTable.body(htmlFormat.summary.plusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))))
+      $('#summary .plus-table').append(htmlFormat.summary.plusTable.body(htmlFormat.summary.plusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))))
       $('.checkbox-cond').removeClass('hidden');
     }      
   }
 
   function reloadSummaryMinus(fields){
     if(fields.length > 0){
-      $(`section#summary .minus-table`).append(htmlFormat.summary.minusTable.body(""));
+      $(`#summary .minus-table`).append(htmlFormat.summary.minusTable.body(""));
       fields.forEach(row => {
-        $(`section#summary .minus-table tbody`).append(htmlFormat.summary.minusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
+        $(`#summary .minus-table tbody`).append(htmlFormat.summary.minusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
         
-        $(`section#summary .minus-table tr:last`).find('[name="target-field"]').val(row.target).change();
-        $(`section#summary .minus-table tr:last`).find('[name="cond-value"]').val(row.cond).change();
+        $(`#summary .minus-table tr:last`).find('[name="target-field"]').val(row.target).change();
+        $(`#summary .minus-table tr:last`).find('[name="cond-value"]').val(row.cond).change();
       });
 
       if(fields.length == 1){
-        $('section#summary .minus-table tr:last').find('.kintoneplugin-button-remove-row-image').hide()
+        $('#summary .minus-table tr:last').find('.kintoneplugin-button-remove-row-image').hide()
       }
     }else{
-      $('section#summary .minus-table').append(htmlFormat.summary.minusTable.body(htmlFormat.summary.minusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))))
+      $('#summary .minus-table').append(htmlFormat.summary.minusTable.body(htmlFormat.summary.minusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))))
       $('.checkbox-cond').removeClass('hidden');
     }      
   }
@@ -723,20 +751,20 @@ jQuery.noConflict();
     vars['apps'] = await loadApps()
     vars['source'] = await loadFields(AppID);
 
-    $('section#transaction select[name="target-app"]').append(getAppOptions(vars.apps));
+    $('#transaction select[name="target-app"]').append(getAppOptions(vars.apps));
     
-    $('section#summary select[name="transaction-app"]').append(getAppOptions(vars.apps));
-    $('section#summary select[name="summary-app"]').append(getAppOptions(vars.apps));
+    $('#summary select[name="transaction-app"]').append(getAppOptions(vars.apps));
+    $('#summary select[name="summary-app"]').append(getAppOptions(vars.apps));
     
     if('summary' in CONF){
       if(CONF.summary.app.source && CONF.summary.app.target){
-        $('section#summary select[name="transaction-app').val(CONF.summary.app.source).change();
-        $('section#summary select[name="summary-app').val(CONF.summary.app.target).change();
+        $('#summary select[name="transaction-app').val(CONF.summary.app.source).change();
+        $('#summary select[name="summary-app').val(CONF.summary.app.target).change();
       }
     }
 
     if(CONF.targetID){
-      $('section#transaction select[name="target-app"]').val(CONF.targetID).change();
+      $('#transaction select[name="target-app"]').val(CONF.targetID).change();
     }
 
   });
@@ -752,7 +780,7 @@ jQuery.noConflict();
     if(vars.target.hasUnique){
       $('.unique-message').html("");
       $('.cond-table').empty();
-      $('section#transaction .mapping-table').empty();
+      $('#transaction .mapping-table').empty();
       
       $('.unique-field').html(htmlFormat.transaction.unique(getUniqueField(vars.target.fieldinfos)));
 
@@ -761,16 +789,16 @@ jQuery.noConflict();
       }
     }else{
       $('.unique-message').html('* The target app must have unique fields.');
-      $('section#transaction .mapping-table').empty();
+      $('#transaction .mapping-table').empty();
       $('.cond-table').empty();
       $('.unique-field').empty();
     }
   });
 
   // Set table
-  $('.js-submit-settings').on('change', 'select[name="unique-field"]', function(e){  
+  $('.sec-form#transaction').on('change', 'select[name="unique-field"]', function(e){  
     let config = kintone.plugin.app.getConfig(PLUGIN_ID);
-    $('section#transaction .mapping-table').empty();
+    $('#transaction .mapping-table').empty();
     $('.cond-table').empty();
 
     // console.log(CONF)
@@ -789,29 +817,29 @@ jQuery.noConflict();
       }else{
         $('.checkbox-cond').removeClass('hidden');
 
-        $('section#transaction .mapping-table').append(htmlFormat.transaction.table.body(htmlFormat.transaction.table.row(getField(vars.source.fieldinfos), getField(vars.target.fieldinfos))));
-        $('section#transaction .mapping-table .kintoneplugin-button-remove-row-image').addClass('hidden');
+        $('#transaction .mapping-table').append(htmlFormat.transaction.table.body(htmlFormat.transaction.table.row(getField(vars.source.fieldinfos), getField(vars.target.fieldinfos))));
+        $('#transaction .mapping-table .kintoneplugin-button-remove-row-image').addClass('hidden');
       }
       vars['setting']['reloaded'] = true;
     }else{
       $('.checkbox-cond').removeClass('hidden');
 
-      $('section#transaction .mapping-table').append(htmlFormat.transaction.table.body(htmlFormat.transaction.table.row(getField(vars.source.fieldinfos), getField(vars.target.fieldinfos))));
-      $('section#transaction .mapping-table .kintoneplugin-button-remove-row-image').addClass('hidden');
+      $('#transaction .mapping-table').append(htmlFormat.transaction.table.body(htmlFormat.transaction.table.row(getField(vars.source.fieldinfos), getField(vars.target.fieldinfos))));
+      $('#transaction .mapping-table .kintoneplugin-button-remove-row-image').addClass('hidden');
     }
   });
 
   // Add
-  $('section#transaction .mapping-table').on('click', '.kintoneplugin-button-add-row-image', function(){
+  $('#transaction .mapping-table').on('click', '.kintoneplugin-button-add-row-image', function(){
     $(this).closest('tr').after(htmlFormat.transaction.table.row(getField(vars.source.fieldinfos), getField(vars.target.fieldinfos)));
-    $('section#transaction .mapping-table .kintoneplugin-button-remove-row-image').removeClass('hidden');
+    $('#transaction .mapping-table .kintoneplugin-button-remove-row-image').removeClass('hidden');
   })
   
   // Remove
-  $('section#transaction .mapping-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
+  $('#transaction .mapping-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
     var rowCount = $(this).closest('tbody').find('tr').length;
     if(rowCount == 2){
-      $('section#transaction .mapping-table .kintoneplugin-button-remove-row-image').addClass('hidden');
+      $('#transaction .mapping-table .kintoneplugin-button-remove-row-image').addClass('hidden');
     }
     $(this).closest('tr').remove();
   })
@@ -826,7 +854,7 @@ jQuery.noConflict();
   })
   
   // Add
-  $('section#summary .mapping-table').on('click', '.kintoneplugin-button-add-row-image', function(){
+  $('#summary .mapping-table').on('click', '.kintoneplugin-button-add-row-image', function(){
     $(this).closest('tr').after(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)));
     $($(this).closest('tbody').find('tr')).each(function(){
       ($(this).find('.kintoneplugin-button-remove-row-image')).show()
@@ -834,7 +862,7 @@ jQuery.noConflict();
   })
   
   // Remove
-  $('section#summary .mapping-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
+  $('#summary .mapping-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
     var rowCount = $(this).closest('tbody').find('tr').length;
     if(rowCount == 2){
       $($(this).closest('tbody').find('tr').find('.kintoneplugin-button-remove-row-image')).hide()
@@ -843,7 +871,7 @@ jQuery.noConflict();
   })
 
    // Add
-   $('section#summary .period-table').on('click', '.kintoneplugin-button-add-row-image', function(){
+   $('#summary .period-table').on('click', '.kintoneplugin-button-add-row-image', function(){
     $(this).closest('tr').after(htmlFormat.summary.periodTable.row(getField(vars.summary.tran.fields.fieldinfos)));
     $($(this).closest('tbody').find('tr')).each(function(){ 
       ($(this).find('.kintoneplugin-button-remove-row-image')).show()
@@ -851,7 +879,7 @@ jQuery.noConflict();
   })
   
   // Remove
-  $('section#summary .period-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
+  $('#summary .period-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
     var rowCount = $(this).closest('tbody').find('tr').length;
     if(rowCount == 2){
       $($(this).closest('tbody').find('tr').find('.kintoneplugin-button-remove-row-image')).hide()
@@ -860,7 +888,7 @@ jQuery.noConflict();
   })
 
   // Add
-  $('section#summary .plus-table').on('click', '.kintoneplugin-button-add-row-image', function(){
+  $('#summary .plus-table').on('click', '.kintoneplugin-button-add-row-image', function(){
     $(this).closest('tr').after(htmlFormat.summary.plusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)));
     $($(this).closest('tbody').find('tr')).each(function(){ 
       ($(this).find('.kintoneplugin-button-remove-row-image')).show()
@@ -868,7 +896,7 @@ jQuery.noConflict();
   })
   
   // Remove
-  $('section#summary .plus-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
+  $('#summary .plus-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
     var rowCount = $(this).closest('tbody').find('tr').length;
     if(rowCount == 2){
       $($(this).closest('tbody').find('tr').find('.kintoneplugin-button-remove-row-image')).hide()
@@ -877,7 +905,7 @@ jQuery.noConflict();
   })
 
   // Add
-  $('section#summary .minus-table').on('click', '.kintoneplugin-button-add-row-image', function(){
+  $('#summary .minus-table').on('click', '.kintoneplugin-button-add-row-image', function(){
     $(this).closest('tr').after(htmlFormat.summary.minusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)));
     $($(this).closest('tbody').find('tr')).each(function(){ 
       ($(this).find('.kintoneplugin-button-remove-row-image')).show()
@@ -885,7 +913,7 @@ jQuery.noConflict();
   })
   
   // Remove
-  $('section#summary .minus-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
+  $('#summary .minus-table').on('click', '.kintoneplugin-button-remove-row-image', function(){
     var rowCount = $(this).closest('tbody').find('tr').length;
     if(rowCount == 2){
       $($(this).closest('tbody').find('tr').find('.kintoneplugin-button-remove-row-image')).hide()
@@ -904,7 +932,7 @@ jQuery.noConflict();
     }
   })
 
-  $('section#transaction .mapping-table').on('change', 'select[name="data-type"]', function(){
+  $('#transaction .mapping-table').on('change', 'select[name="data-type"]', function(){
     let type = $('option:selected', this).attr('value');
     if(type == 'select'){
       $($(this).closest('tr').find('.source-field .kintoneplugin-table-td-control-value')[0]).html(`
@@ -949,52 +977,52 @@ jQuery.noConflict();
     }
   });
 
-  $('section#summary select[name="transaction-app"], section#summary select[name="summary-app"]').on('change', async function(){
-    vars['summary']['tran']['appID'] = $('section#summary select[name="transaction-app"]').find(':selected').val();
+  $('#summary select[name="transaction-app"], #summary select[name="summary-app"]').on('change', async function(){
+    vars['summary']['tran']['appID'] = $('#summary select[name="transaction-app"]').find(':selected').val();
     
     if(vars['summary']['tran']['appID'] != 'null'){
       vars['summary']['tran']['fields'] = await loadFields(vars['summary']['tran']['appID']);
     }
 
-    vars['summary']['sum']['appID'] = $('section#summary select[name="summary-app"]').find(':selected').val();
+    vars['summary']['sum']['appID'] = $('#summary select[name="summary-app"]').find(':selected').val();
     if(vars['summary']['sum']['appID'] != 'null'){
       vars['summary']['sum']['fields'] = await loadFields(vars['summary']['sum']['appID']);
     }
 
-    $('section#summary .mapping-table').empty()
-    $('section#summary .period-table').empty()
-    $('section#summary .summary-field').empty()
+    $('#summary .mapping-table').empty()
+    $('#summary .period-table').empty()
+    $('#summary .summary-field').empty()
 
     if(vars['summary']['tran']['appID'] != 'null' && vars['summary']['sum']['appID'] != 'null'){
       reloadSummary(CONF.summary)
       reloadPeriod(CONF.summary.period)
 
-      $('section#summary .summary-field').append(htmlFormat.summary.summaryField(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
-      $('section#summary [name="sum-source-field"]').val(CONF.summary.summary.source).change()
-      $('section#summary [name="sum-target-field"]').val(CONF.summary.summary.target).change()
+      $('#summary .summary-field').append(htmlFormat.summary.summaryField(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
+      $('#summary [name="sum-source-field"]').val(CONF.summary.summary.source).change()
+      $('#summary [name="sum-target-field"]').val(CONF.summary.summary.target).change()
     }
   });
 
-  $('section#summary').on('change', '.summary-field select[name="sum-source-field"], .summary-field select[name="sum-target-field"]', function(){
-    $('section#summary .plus-table').empty()
-    $('section#summary .minus-table').empty()
-    if($('section#summary .summary-field select[name="sum-source-field"]').find(':selected').val() != 'null' && $('section#summary .summary-field select[name="sum-target-field"]').find(':selected').val() != 'null'){
+  $('#summary').on('change', '.summary-field select[name="sum-source-field"], .summary-field select[name="sum-target-field"]', function(){
+    $('#summary .plus-table').empty()
+    $('#summary .minus-table').empty()
+    if($('#summary .summary-field select[name="sum-source-field"]').find(':selected').val() != 'null' && $('#summary .summary-field select[name="sum-target-field"]').find(':selected').val() != 'null'){
       reloadSummaryPlus(CONF.summary.plus)
       reloadSummaryMinus(CONF.summary.minus)
     }
   });
 
-  $('section#summary .mapping-table').on('change', 'select[name="source-field"]', function(){
+  $('#summary .mapping-table').on('change', 'select[name="source-field"]', function(){
     let val = $(this).val()
-    console.log(vars.summary.tran.fields.fieldinfos[val]['type'])
+    // console.log(vars.summary.tran.fields.fieldinfos[val]['type'])
     if(vars.summary.tran.fields.fieldinfos[val]['type'] != "DATE"){
-      $('section#summary .mapping-table tr:last').find('[name="format-field"]').attr('disabled', 'disabled')
+      $('#summary .mapping-table tr:last').find('[name="format-field"]').attr('disabled', 'disabled')
     }else{
-      $('section#summary .mapping-table tr:last').find('[name="format-field"]').removeAttr('disabled')
+      $('#summary .mapping-table tr:last').find('[name="format-field"]').removeAttr('disabled')
     }
   });
 
-  $form.on('submit', function(e) {
+  $('.kintoneplugin-button-dialog-ok').on('click', function(e) {
     let hasSubtable = false;
 
     e.preventDefault();
@@ -1031,7 +1059,7 @@ jQuery.noConflict();
         'value': element['value'].val()});
     })
 
-    $('section#transaction .mapping-table tbody tr').each(function(){
+    $('#transaction .mapping-table tbody tr').each(function(){
       // console.log($(this).find('[name="source-field"]').val());
       // console.log($(this).find('[name="target-field"]').val());
       // console.log($(this).find('[name="data-type"]').val());
@@ -1092,7 +1120,7 @@ jQuery.noConflict();
     summary['app']['target'] = $('select[name="summary-app"]').find(':selected').val();
 
     summary['mapping'] = []
-    $('section#summary .mapping-table tbody tr').each(function(){
+    $('#summary .mapping-table tbody tr').each(function(){
 
       let element = {
         'target' : $(this).find('[name="target-field"]'),
@@ -1117,7 +1145,7 @@ jQuery.noConflict();
     })
 
     summary['period'] = []
-    $('section#summary .period-table tbody tr').each(function(){
+    $('#summary .period-table tbody tr').each(function(){
 
       let element = {
         'source' : $(this).find('[name="source-field"]'),
@@ -1142,7 +1170,7 @@ jQuery.noConflict();
     
     // Plus
     summary['plus'] = []
-    $('section#summary .plus-table tbody tr').each(function(){
+    $('#summary .plus-table tbody tr').each(function(){
 
       let element = {
         'target' : $(this).find('[name="target-field"]'),
@@ -1164,7 +1192,7 @@ jQuery.noConflict();
 
     // Minus
     summary['minus'] = []
-    $('section#summary .minus-table tbody tr').each(function(){
+    $('#summary .minus-table tbody tr').each(function(){
 
       let element = {
         'target' : $(this).find('[name="target-field"]'),
