@@ -20,3 +20,7 @@
 .kintoneplugin-button-remove-row-image.hidden-cond{
   display: none;
 }
+
+.checkbox-cond.hidden{
+  display: none;
+}

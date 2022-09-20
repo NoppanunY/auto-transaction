@@ -3,9 +3,99 @@ jQuery.noConflict();
 (function($, PLUGIN_ID) {
   'use strict';
 
+  // const
+  const AppID = kintone.app.getId();
+
   var old_subtable = [];
 
   var isProceed = false;
+
+  var vars = {
+    apps: {},
+    source: {},
+    target: {},
+    setting: {
+      reloaded: false
+    }
+  }
+
+  function loadFields(ID){
+    let fields = {
+      fieldinfos: {},
+      hasUnique: false
+    }
+    return new Promise ((resolve) => {
+      kintone.api(kintone.api.url('/k/v1/app/form/fields', true), 'GET', {
+        'app': ID
+      }).then(function(resp){
+        $.each(resp.properties, function(index, value){
+          fields['fieldinfos'][value.code] = value
+          if(value.hasOwnProperty('unique')){
+            fields['hasUnique'] = true;
+          }
+        });
+        resolve(fields);
+      });
+    })
+  }
+
+  function checkCondition(cond, record){
+    let check = false;
+    cond.forEach(element => {
+      if(element.field in record){
+        switch(element.operator){
+          case "=":
+            if(record[element.field]['value'] == element.value){
+              check = true;
+            }
+            break;
+          case "<>":
+            if(record[element.field]['value'] != element.value){
+              check = true;
+            }
+            break;
+          case ">=":
+            if(record[element.field]['value'] >= element.value){
+              check = true;
+            }
+            break;
+          case "<=":
+            if(record[element.field]['value'] <= element.value){
+              check = true;
+            }
+            break;
+        }
+      }
+    });
+
+    return check;
+  }
+
+  function getRecord(json, element, record){
+    let recordsFields = {};
+    return new Promise((resolve) => {
+      json.forEach(field => {
+        if(field['source']['type'] == 'subtable'){
+          recordsFields[field['target']['value']] = {
+            'value': element['value'][field['source']['value']['value']]['value']
+          }
+        }else{
+          recordsFields[field['target']['value']] = {
+            'value' : field['source']['type']=='select' ? record[field['source']['value']]['value'] : field['source']['value']
+          };
+        }
+      });
+
+      resolve(recordsFields);
+    })
+  }
+  
+  $(document).ready(async function(){
+    /*---------------------------------------------------------------
+    initialize fields
+    ---------------------------------------------------------------*/
+    vars['source'] = await loadFields(AppID);
+  });
 
   kintone.events.on('app.record.index.show', function() {
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
@@ -27,40 +117,13 @@ jQuery.noConflict();
     var json = JSON.parse(config.fieldinfos);
     // console.log(json)
 
-    var checkCond = false;
+
     var records = [];
     var recordsFields = {};
-
-    // recordsFields['io_type'] = {'value': "IN"}
     
     let subtableGroup = "";
 
-    cond.forEach(element => {
-      if(element.field in record){
-        switch(element.operator){
-          case "=":
-            if(record[element.field]['value'] == element.value){
-              checkCond = true;
-            }
-            break;
-          case "<>":
-            if(record[element.field]['value'] != element.value){
-              checkCond = true;
-            }
-            break;
-          case ">=":
-            if(record[element.field]['value'] >= element.value){
-              checkCond = true;
-            }
-            break;
-          case "<=":
-            if(record[element.field]['value'] <= element.value){
-              checkCond = true;
-            }
-            break;
-        }
-      }
-    });
+    let checkCond = checkCondition(cond, record);
 
     if(checkCond){
       recordsFields[config.uniqueField] = {'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')}
@@ -102,6 +165,7 @@ jQuery.noConflict();
         });
       }
     }
+
   });
 
   kintone.events.on('app.record.edit.show', function(event){
@@ -147,39 +211,11 @@ jQuery.noConflict();
     var record = event.record;
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
     var json = JSON.parse(config.fieldinfos);
-    var cond = JSON.parse(config.conditions);
     
     var recordsFields = {};
     let subtableGroup = "";
-    var checkCond = false;
 
-    // console.log(record)
-    cond.forEach(element => {
-      if(element.field in record){
-        switch(element.operator){
-          case "=":
-            if(record[element.field]['value'] == element.value){
-              checkCond = true;
-            }
-            break;
-          case "<>":
-            if(record[element.field]['value'] != element.value){
-              checkCond = true;
-            }
-            break;
-          case ">=":
-            if(record[element.field]['value'] >= element.value){
-              checkCond = true;
-            }
-            break;
-          case "<=":
-            if(record[element.field]['value'] <= element.value){
-              checkCond = true;
-            }
-            break;
-        }
-      }
-    });
+    let checkCond = checkCondition(cond, record);
 
     if(checkCond){
       json.forEach(element => {
@@ -188,7 +224,7 @@ jQuery.noConflict();
         }
         recordsFields[element['target']['value']] = {
           'value' : element['source']['type']=='select' ? record[element['source']['value']]['value'] : element['source']['value']
-        };
+        };s
       });
       
       if(subtableGroup != ""){      
@@ -265,7 +301,6 @@ jQuery.noConflict();
     }
   });
 
-
   kintone.events.on('app.record.detail.show', function(event){
     var record = event.record;
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
@@ -274,7 +309,7 @@ jQuery.noConflict();
     
     var recordsFields = {};
     let subtableGroup = "";
-    var checkCond = false;
+    
 
     console.log(record);
 
@@ -309,33 +344,7 @@ jQuery.noConflict();
         });
       }
 
-      console.log(record)
-      cond.forEach(element => {
-        if(element.field in record){
-          switch(element.operator){
-            case "=":
-              if(record[element.field]['value'] == element.value){
-                checkCond = true;
-              }
-              break;
-            case "<>":
-              if(record[element.field]['value'] != element.value){
-                checkCond = true;
-              }
-              break;
-            case ">=":
-              if(record[element.field]['value'] >= element.value){
-                checkCond = true;
-              }
-              break;
-            case "<=":
-              if(record[element.field]['value'] <= element.value){
-                checkCond = true;
-              }
-              break;
-          }
-        }
-      });
+      var checkCond = checkCondition(cond, record);
 
       if(checkCond){
         json.forEach(element => {
@@ -423,38 +432,8 @@ jQuery.noConflict();
   });
 
   kintone.events.on('app.record.detail.process.proceed', async function(event){
-    var record = event.record;
-    console.log(record);
-    var config = kintone.plugin.app.getConfig(PLUGIN_ID);
-    var json = JSON.parse(config.fieldinfos);
-    var cond = JSON.parse(config.conditions);
-    
-    var recordsFields = {};
-    let subtableGroup = "";
-    var checkCond = false;
     isProceed = true;
-    
   });
-
-
-  function getRecord(json, element, record){
-    let recordsFields = {};
-    return new Promise((resolve) => {
-      json.forEach(field => {
-        if(field['source']['type'] == 'subtable'){
-          recordsFields[field['target']['value']] = {
-            'value': element['value'][field['source']['value']['value']]['value']
-          }
-        }else{
-          recordsFields[field['target']['value']] = {
-            'value' : field['source']['type']=='select' ? record[field['source']['value']]['value'] : field['source']['value']
-          };
-        }
-      });
- 
-      resolve(recordsFields);
-    })
-  }
 
   kintone.events.on('app.record.detail.delete.submit', function(event){
     var record = event.record;
@@ -462,7 +441,7 @@ jQuery.noConflict();
     var json = JSON.parse(config.fieldinfos);
     
     var query = `${config.uniqueField} like "${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')}"`;
-    kintone.api(kintone.api.url('/k/v1/records', true) + '?app=' + config.targetID + '&query=' + query, 'GET', {}, function(resp) {
+    kintone.api(kintone.api.url('/k/v1/records', true) + '?app=164&query=' + query, 'GET', {}, function(resp) {
       console.log(resp)
       if(resp['records'].length > 0){
         resp.records.forEach(element => {
