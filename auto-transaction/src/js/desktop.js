@@ -94,6 +94,8 @@ jQuery.noConflict();
   async function updateSummary(config){
     // console.log(config);
     
+    const b1 = performance.now();
+
     console.group("Update")
     
     let period = []
@@ -104,6 +106,7 @@ jQuery.noConflict();
       );
     }
     query += period.join(" and ")
+
     var sourceRecords = await fetch_record(config.app.source, query);
 
     let filter = []
@@ -125,16 +128,34 @@ jQuery.noConflict();
       return
     }
 
+    // let period = []
+    let cond = {
+      'plus': {},
+      'minus': {}
+    }
+
+    for(let plus of config.plus){
+      if(plus.target in cond){
+        cond['plus'][plus.target].push(plus.cond)
+      }else{
+        cond['plus'][plus.target] = [plus.cond]
+      }
+    }
+
+    for(let minus of config.minus){
+      if(minus.target in cond){
+        cond['minus'][minus.target].push(minus.cond)
+      }else{
+        cond['minus'][minus.target] = [minus.cond]
+      }
+    }
+    
     for (let elm of sourceRecords.records) {
-      
+
       // console.log(elm)
       let query_target = []
       let query_source = []
-      let period = []
-      let cond = {
-        'plus': {},
-        'minus': {}
-      }
+      
       let isExist = []
       let body = {
         'app': "",
@@ -145,8 +166,8 @@ jQuery.noConflict();
       
       for(let map of config.mapping){
         if(map.type != "DATE"){
-          query_target.push(`${map.target} like "${elm[map.source]['value']}"`);
-          query_source.push(`${map.source} like "${elm[map.source]['value']}"`);
+          query_target.push(`${map.target} = "${elm[map.source]['value']}"`);
+          query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
           body['record'][map.target] = {'value' : elm[map.source]['value']}
         }else{
           query_target.push(`${map.target} = "${luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)}"`);
@@ -155,58 +176,35 @@ jQuery.noConflict();
           body['record'][map.target] = {
             'value' : luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)
           }
-
-          // new Date(elm[map.source]['value']);
-          // luxon.DateTime.fromISO(elm[map.source]['value']).toRelative();
-          // luxon.DateTime.fromISO(elm[map.source]['value']).toFormat('MMMM dd, yyyy')
         }
-        isExist.push(`${map.target} like "${elm[map.source]['value']}"`);
-        
-      }
-
-      for(let p of config.period){
-        period.push(
-          `${p.source} = ${p.period}`
-        );
-      }
-
-      for(let c of config.plus){
-        if(c.target in cond){
-          cond['plus'][c.target].push(c.cond)
-        }else{
-          cond['plus'][c.target] = [c.cond]
-        }
-      }
-
-      for(let c of config.minus){
-        if(c.target in cond){
-          cond['minus'][c.target].push(c.cond)
-        }else{
-          cond['minus'][c.target] = [c.cond]
-        }
+        isExist.push(`${map.target} like "${elm[map.source]['value']}"`); 
       }
 
       if(!filter.includes(isExist.join(" and "))){
         // PLUS
         let query_str = query_source.join(" and ")
-        let c = []
+        let foo = []
         for(const [key, value] of Object.entries(cond.plus)){
-          c.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+          foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
         }
-        query_str += " and " + c.join(" and ")
+        query_str += " and " + foo.join(" and ")
         query_str += " and " + period.join(" and ")
+        console.group("Plus")
         let plus_total = await calc_summary(config.app.source ,query_str , config.summary.source, {'plus': config.plus, 'minus': config.minus});
-        
+        console.groupEnd()
+
         // MINUS
         query_str = query_source.join(" and ")
-        c = []
+        foo = []
         for(const [key, value] of Object.entries(cond.minus)){
-          c.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+          foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
         }
-        query_str += " and " + c.join(" and ")
+        query_str += " and " + foo.join(" and ")
         query_str += " and " + period.join(" and ")
+        console.group("Minus")
         let minus_total = await calc_summary(config.app.source ,query_str , config.summary.source, {'plus': config.plus, 'minus': config.minus});
-        
+        console.groupEnd()
+
         // console.log(plus_total)
         // console.log(minus_total)
         
@@ -232,6 +230,124 @@ jQuery.noConflict();
         // console.log(plus_total-minus_total)
       }
     }
+    const b2 = performance.now();
+    console.log(`Time: ${b2 - b1}`);
+    console.log("Finish")
+    console.groupEnd()
+  }
+
+  async function isExistTransaction(config, record){
+    // console.log(config);
+    
+    console.group("Check is exist")
+    
+    let period = []
+    let query = ""
+
+    let filter = []
+
+    let insert_record = []
+    let update_record = []
+
+    let query_target = []
+    let query_source = []
+    let cond = {
+      'plus': {},
+      'minus': {}
+    }
+    let isExist = []
+    let body = {
+      'app': "",
+      'record': {}
+    }
+
+    body['app'] = config.app.target
+    
+    for(let map of config.mapping){
+      if(map.type != "DATE"){
+        query_target.push(`${map.target} = "${record[map.source]['value']}"`);
+        query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+        body['record'][map.target] = {'value' : record[map.source]['value']}
+      }else{
+        query_target.push(`${map.target} = "${luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)}"`);
+        query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+        
+        body['record'][map.target] = {
+          'value' : luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)
+        }
+
+      }
+      isExist.push(`${map.target} like "${record[map.source]['value']}"`);
+      
+    }
+
+    for(let p of config.period){
+      period.push(
+        `${p.source} = ${p.period}`
+      );
+    }
+
+    for(let c of config.plus){
+      if(c.target in cond){
+        cond['plus'][c.target].push(c.cond)
+      }else{
+        cond['plus'][c.target] = [c.cond]
+      }
+    }
+
+    for(let c of config.minus){
+      if(c.target in cond){
+        cond['minus'][c.target].push(c.cond)
+      }else{
+        cond['minus'][c.target] = [c.cond]
+      }
+    }
+
+    if(!filter.includes(isExist.join(" and "))){
+      // PLUS
+      let query_str = query_source.join(" and ")
+      let c = []
+      for(const [key, value] of Object.entries(cond.plus)){
+        c.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+      }
+      query_str += " and " + c.join(" and ")
+      query_str += " and " + period.join(" and ")
+
+      let check = await new Promise((resolve) => {
+        kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.app.source}&query=${query_str}`, 'GET', {},  function(resp) {
+          // success
+          console.log(resp.records.length)
+          if(resp.records.length == 0){
+            resolve(true)
+          }else{
+            resolve(false)
+          }
+          
+        }, function(error) {
+          // error
+          console.log(error);
+        });
+      })
+
+      if(check){
+        await new Promise((resolve) => {
+          kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.app.target}&query=${query_target.join(" and ")}` , 'GET', {}, function(resp){
+            console.table(resp.records[0])
+            kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
+              'app': config.app.target,
+              'ids': [resp.records[0]['$id']['value']]
+            }, function(resp){
+              resolve()
+            })
+          })
+        }) 
+      }
+
+      filter.push(isExist.join(" and "))
+      // console.log(filter)
+      // console.log(plus_total-minus_total)
+    }
+
     console.log("Finish")
     console.groupEnd()
   }
@@ -242,6 +358,7 @@ jQuery.noConflict();
 
         // console.log(appID, query, field)
         console.group("Calc")
+        console.log("App " + appID + " Query " + query)
         // console.log(cond);
 
         kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${appID}&query=${query}`, 'GET', {},  function(resp) {
@@ -264,6 +381,7 @@ jQuery.noConflict();
   function fetch_record(appID, query) {
     return new Promise((resolve) => {
       console.group("Fetch")
+      console.log("App " + appID + " Query " + query)
       kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${appID}&query=${query}`, 'GET', {}, function(resp){
         console.log(resp)
         console.groupEnd()
@@ -450,7 +568,7 @@ jQuery.noConflict();
       if(subtableGroup != ""){   
         for(let rold of old_subtable){
         // old_subtable.forEach(rold => {
-          let isExist = false;
+            let isExist = false;
             for(let rnew of record[subtableGroup]['value']){
             // record[subtableGroup]['value'].forEach(rnew => {
               console.log(rnew)
@@ -467,19 +585,18 @@ jQuery.noConflict();
                 kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
                   'app': config.targetID,
                   'query': `${config.uniqueField} in ("${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + rold['records']['id'].toString().padStart(4, '0')}")`,
-                  'fields': ['$id']
                 }).then((resp) => {
-                  resolve(resp)
+                  if(resp['records'].length > 0){
+                    kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
+                      'app': config.targetID,
+                      'ids': [resp['records'][0]['$id']['value']]
+                    }).then(async (delete_res) => {
+                      console.log("Delete", resp['records'][0]);
+                      await isExistTransaction(JSON.parse(config.summary), resp.records[0])
+                      resolve(resp)
+                    });
+                  }
                 });   
-              }).then((resp) => {
-                if(resp['records'].length > 0){
-                  kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
-                    'app': config.targetID,
-                    'ids': [resp['records'][0]['$id']['value']]
-                  }).then((delete_res) => {
-                    console.log("Delete", resp['records'][0]);
-                  });
-                }
               })
             }     
         // })
@@ -498,10 +615,9 @@ jQuery.noConflict();
             kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
               'app': config.targetID,
               'query': `${config.uniqueField} in ("${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')}")`,
-              'fields': ['$id']
-            }).then((resp) => {
-              console.log(resp);
-              if(resp['records'].length == 0){
+            }).then((resp_1) => {
+              console.log(resp_1);
+              if(resp_1['records'].length == 0){
                 kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
                   'app': config.targetID,
                   'record': recordField
@@ -517,7 +633,8 @@ jQuery.noConflict();
                     'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')
                   },
                   'record': recordField
-                }, function(resp){
+                },async function(resp){
+                  await isExistTransaction(JSON.parse(config.summary), resp_1.records[0])
                   resolve(resp)
                 });
               }
@@ -556,7 +673,7 @@ jQuery.noConflict();
     // console.log(record);
 
     if(isProceed){
-      console.log("Update");
+      console.group("Update with process");
       if(config.hasSubtable == 'true'){
         old_subtable = []
         var json = JSON.parse(config.fieldinfos);
@@ -612,14 +729,14 @@ jQuery.noConflict();
                 kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
                   'app': config.targetID,
                   'query': `${config.uniqueField} in ("${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + rold['records']['id'].toString().padStart(4, '0')}")`,
-                  'fields': ['$id']
-                }).then((res) => {
-                  if(res['records'].length > 0){
+                }).then((resp) => {
+                  if(resp['records'].length > 0){
                     kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
                       'app': config.targetID,
-                      'ids': [res['records'][0]['$id']['value']]
-                    }).then((delete_res) => {
-                      console.log("Delete", res['records'][0]);
+                      'ids': [resp['records'][0]['$id']['value']]
+                    }).then(async (delete_res) => {
+                      await isExistTransaction(JSON.parse(config.summary), resp.records[0])
+                      console.log("Delete", resp['records'][0]);
                     });
                   }
                 });   
@@ -635,32 +752,38 @@ jQuery.noConflict();
                       element['id'].toString().padStart(4, '0')
             }
             
-            kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
-              'app': config.targetID,
-              'query': `${config.uniqueField} in ("${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')}")`,
-              'fields': ['$id']
-            }).then((resp) => {
-              console.log(resp);
-              if(resp['records'].length == 0){
-                kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
-                  'app': config.targetID,
-                  'record': recordField
-                });
-              }else{
-                delete recordField[config.uniqueField];
-                kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
-                  'app': config.targetID,
-                  'updateKey': {
-                    'field': config.uniqueField,
-                    'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')
-                  },
-                  'record': recordField
-                });
-              }
-            });  
+            await new Promise((resolve) => {
+              kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
+                'app': config.targetID,
+                'query': `${config.uniqueField} in ("${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')}")`,
+                'fields': ['$id']
+              }).then((resp) => {
+                console.log(resp);
+                if(resp['records'].length == 0){
+                  kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
+                    'app': config.targetID,
+                    'record': recordField
+                  }, function(resp){
+                    resolve(resp)
+                  });
+                }else{
+                  delete recordField[config.uniqueField];
+                  kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
+                    'app': config.targetID,
+                    'updateKey': {
+                      'field': config.uniqueField,
+                      'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')
+                    },
+                    'record': recordField
+                  }, function(resp){
+                    resolve(resp)
+                  });
+                }
+              });  
+            })
           // });
           }
-
+          console.groupEnd()
           await updateSummary(JSON.parse(config.summary));
         }else{
           kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
@@ -682,30 +805,44 @@ jQuery.noConflict();
     isProceed = true;
   });
 
-  kintone.events.on(['app.record.detail.delete.submit', 'app.record.index.delete.submit'], function(event){
+  kintone.events.on(['app.record.detail.delete.submit', 'app.record.index.delete.submit'],async function(event){
     var record = event.record;
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
     var json = JSON.parse(config.fieldinfos);
     
     var query = `${config.uniqueField} like "${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')}"`;
-    kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.targetID}&query=` + query, 'GET', {},async function(resp) {
-      console.log(resp)
-      if(resp['records'].length > 0){
-        for(let element of resp.records){
-          await new Promise((resolve) => {
-            kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
-              'app': config.targetID,
-              'ids': [element['$id']['value']]
-            }).then((delete_res) => {
-              console.log("Delete", element['$id']['value']);
-              resolve(delete_res)
-            });
-          })
+    
+    await new Promise((resolve) => {
+      kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.targetID}&query=` + query, 'GET', {},async function(resp) {
+        console.log(resp)
+        if(resp['records'].length > 0){
+          for(let record of resp.records){
+            await new Promise((resolve) => {
+              kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
+                'app': config.targetID,
+                'ids': [record['$id']['value']]
+              }).then(async (delete_res) => {
+                // if(!isExistTransaction(JSON.parse(config.summary), record)){
+  
+                // }
+                await isExistTransaction(JSON.parse(config.summary), record)
+                console.log("Delete", record['$id']['value']);
+                console.log(delete_res)
+                resolve(delete_res)
+              });
+            })
+          }
+  
+          await updateSummary(JSON.parse(config.summary)).then((result) => {
+            console.log("Delete")
+            resolve()
+          });
         }
+      });
+    })
 
-        await updateSummary(JSON.parse(config.summary));
-      }
-    });
+    console.log("Deleted")
+    return event;
 
   });
 

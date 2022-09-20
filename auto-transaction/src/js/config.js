@@ -9,7 +9,8 @@ jQuery.noConflict();
   const ignoreField = ['id', 'status', 'app_id', 'ref_record_no'];
 
   const CONF = kintone.plugin.app.getConfig(PLUGIN_ID);
-  CONF['summary'] = JSON.parse(kintone.plugin.app.getConfig(PLUGIN_ID)['summary']);
+  if('summary' in CONF)
+    CONF['summary'] = JSON.parse(kintone.plugin.app.getConfig(PLUGIN_ID)['summary']);
   
   // Template Html
 
@@ -727,9 +728,11 @@ jQuery.noConflict();
     $('section#summary select[name="transaction-app"]').append(getAppOptions(vars.apps));
     $('section#summary select[name="summary-app"]').append(getAppOptions(vars.apps));
     
-    if(CONF.summary.app.source && CONF.summary.app.target){
-      $('section#summary select[name="transaction-app').val(CONF.summary.app.source).change();
-      $('section#summary select[name="summary-app').val(CONF.summary.app.target).change();
+    if('summary' in CONF){
+      if(CONF.summary.app.source && CONF.summary.app.target){
+        $('section#summary select[name="transaction-app').val(CONF.summary.app.source).change();
+        $('section#summary select[name="summary-app').val(CONF.summary.app.target).change();
+      }
     }
 
     if(CONF.targetID){
