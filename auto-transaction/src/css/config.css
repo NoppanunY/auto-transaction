@@ -1,5 +1,35 @@
+.dt-sec{
+  display: flex;
+  flex-direction: column;
+  row-gap: .5rem;
+  margin-bottom: 1.5rem;
+}
+
 .settings-heading {
-  padding: 1em 0;
+  padding-left: 4px;
+  border-left: 4px solid rgb(201, 201, 201);
+  border-bottom: 2px solid rgb(201, 201, 201);
+}
+
+.dt-sec .sec-title{
+  font-size: 1rem;
+  font-weight: bold;
+  padding: .5rem 0;
+  border-top: 2px solid rgb(201, 201, 201);
+  border-bottom: 2px solid rgb(201, 201, 201);
+}
+
+.dt-paragraph{
+  position: relative;
+  padding-left: 1rem;
+}
+
+/* Input */
+.dt-form-group.horizontal{
+  display: flex;
+  flex-direction: row;
+  column-gap: .5rem;
+  align-items: center;
 }
 
 .kintoneplugin-input-text {
@@ -18,5 +48,13 @@
 
 .kintoneplugin-button-remove-row-image.hidden,
 .kintoneplugin-button-remove-row-image.hidden-cond{
+  display: none;
+}
+
+.checkbox-cond.hidden{
+  display: none;
+}
+
+input:disabled{
   display: none;
 }
