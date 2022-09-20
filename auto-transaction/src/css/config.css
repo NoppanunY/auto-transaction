@@ -24,3 +24,7 @@
 .checkbox-cond.hidden{
   display: none;
 }
+
+input:disabled{
+  display: none;
+}
