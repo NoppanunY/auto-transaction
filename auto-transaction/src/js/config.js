@@ -361,6 +361,10 @@ jQuery.noConflict();
                     ${tableBody}
                   </tbody>
                 </table>
+
+                <!-- <div class="kintoneplugin-table-td-operation">
+                  <button type="button" class="kintoneplugin-button-add-row-image" title="Add row"></button>
+                </div> -->
               `,
         row:  (sourceOptions) => `
                 <tr>
@@ -479,7 +483,8 @@ jQuery.noConflict();
     }
     return new Promise ((resolve) => {
       kintone.api(kintone.api.url('/k/v1/app/form/fields', true), 'GET', {
-        'app': ID
+        'app': ID,
+        'query': 'order by '
       }).then(function(resp){
         $.each(resp.properties, function(index, value){
           fields['fieldinfos'][value.code] = value
@@ -523,7 +528,27 @@ jQuery.noConflict();
 
   function getAppOptions(apps){
     let htmlOptions = ""
-    for (const [key, value] of Object.entries(apps)) {
+
+    let sorted = []
+
+    for(let key in apps){
+      sorted.push(key)
+    }
+    
+    for(let i=0; i<sorted.length; i++){
+      for(let j=0; j<sorted.length; j++){
+        if(apps[sorted[j]].name >= apps[sorted[i]].name){
+          let temp = sorted[i]
+          sorted[i] = sorted[j]
+          sorted[j] = temp
+        }
+      }
+    }
+    
+    for(const key of sorted){
+
+    // for (const [key, value] of Object.entries(apps)) {
+      let value = apps[key]
       htmlOptions += `<option value="${value.appId}">${value.name}</option>`
     }
     return htmlOptions;
@@ -532,10 +557,26 @@ jQuery.noConflict();
   function getField(fields){
     let htmlOptions = ""
     let optionGroup = [];
-    // console.log(fields);
-    // Load source fields 
-    for (const [key, field] of Object.entries(fields)){
-      switch(field.type){
+
+    let sorted = []
+
+    for(let key in fields){
+      sorted.push(key)
+    }
+    
+    for(let i=0; i<sorted.length; i++){
+      for(let j=0; j<sorted.length; j++){
+        if(fields[sorted[j]].label >= fields[sorted[i]].label){
+          let temp = sorted[i]
+          sorted[i] = sorted[j]
+          sorted[j] = temp
+        }
+      }
+    }
+    
+    for(const key of sorted){
+    // for (const [key, field] of Object.entries(fields)){
+      switch(fields[key].type){
         case 'CATEGORY':
         case 'CREATED_TIME':
         case 'CREATOR':
@@ -548,21 +589,39 @@ jQuery.noConflict();
         case 'RECORD_NUMBER':
           break;
         case 'SUBTABLE':
-          // console.log(field);
+          // console.log(fields[key]);
           optionGroup.push({
-            'label': field.label,
-            'value': field.code,
+            'label': fields[key].label,
+            'value': fields[key].code,
             'options': ((foo, group) => {
               let str = "";
-              for (const [key, value] of Object.entries(foo)) {
+
+              let nestedSorted = []
+
+              for(let key in foo){
+                nestedSorted.push(key)
+              }
+              
+              for(let i=0; i<nestedSorted.length; i++){
+                for(let j=0; j<nestedSorted.length; j++){
+                  if(foo[nestedSorted[j]].label >= foo[nestedSorted[i]].label){
+                    let temp = nestedSorted[i]
+                    nestedSorted[i] = nestedSorted[j]
+                    nestedSorted[j] = temp
+                  }
+                }
+              }
+
+              for(const key of nestedSorted){
+                let value = foo[key]
                 str += `<option value="${value.code}" group="${group}">${value.label}</option>`;
               }
               return str;
-            })(field.fields, field.code)
+            })(fields[key].fields, fields[key].code)
           });
 
         default :
-        htmlOptions += `<option value="${field.code}">${field.label}</option>`;
+        htmlOptions += `<option value="${fields[key].code}">${fields[key].label}</option>`;
       }
     }
 
@@ -592,7 +651,7 @@ jQuery.noConflict();
           if('unique' in field){
             if(field.unique){
               htmlOptions += `<option value="${field.code}">${field.label}</option>`;
-            }
+            } 
           }
       }
     }
@@ -772,7 +831,10 @@ jQuery.noConflict();
   /*---------------------------------------------------------------
     Event function
     ---------------------------------------------------------------*/
-  // reload target fields
+  
+  /**
+   * ถ้า target app ถูกเปลี่ยน จะสร้าง unique field
+   */
   $('select[name="target-app"]').on('change', async function(){
     vars['target'] = await loadFields($(this).val());
     targetID = $('select[name="target-app"]').find(':selected').val();
@@ -784,6 +846,7 @@ jQuery.noConflict();
       
       $('.unique-field').html(htmlFormat.transaction.unique(getUniqueField(vars.target.fieldinfos)));
 
+      // เช็คถ้ามี unique field
       if(CONF.uniqueField){
         $('select[name="unique-field"]').val(CONF.uniqueField).change();  
       }
@@ -795,21 +858,31 @@ jQuery.noConflict();
     }
   });
 
-  // Set table
+  /**
+   * ถ้า unique field ถูกเปลี่ยน
+   */
   $('.sec-form#transaction').on('change', 'select[name="unique-field"]', function(e){  
     let config = kintone.plugin.app.getConfig(PLUGIN_ID);
+
+    // รีเซ็ตตาราง
     $('#transaction .mapping-table').empty();
     $('.cond-table').empty();
 
-    // console.log(CONF)
+    // ถ้าเข้าครั้งแรก
     if(!vars.setting.reloaded){
-      if(CONF.uniqueField){
+
+      // ถ้ามี unique field
+      if(CONF.uniqueField){ 
         if(CONF.uniqueField == $('select[name="unique-field"]').val()){
+
+          // รีโหลดตาราง conditions
           if('conditions' in CONF){
             reloadCondition(JSON.parse(CONF.conditions));
           }else{
             $('.checkbox-cond').removeClass('hidden');
           }
+
+          // รีโหลด mapping table
           if('fieldinfos' in CONF){
             reloadField(JSON.parse(CONF.fieldinfos), vars.source, vars.target);
           }
@@ -844,11 +917,14 @@ jQuery.noConflict();
     $(this).closest('tr').remove();
   })
 
+
+  // Add
   $('.checkbox-cond').on('click', '.kintoneplugin-button-add-row-image', function(){
     $(this).closest('.checkbox-cond').addClass('hidden');
     $('.cond-table').append(htmlFormat.condition.table.body(htmlFormat.condition.table.row(getCondField(vars.source.fieldinfos))));
   })
 
+  // Remove
   $('.cond-table').on('click', '.kintoneplugin-button-add-row-image.cond', function(){
     $(this).closest('tr').after(htmlFormat.condition.table.row(getCondField(vars.source.fieldinfos)));
   })
@@ -921,9 +997,9 @@ jQuery.noConflict();
     $(this).closest('tr').remove();
   })
 
+  // Remove all
   $('.cond-table').on('click', '.kintoneplugin-button-remove-row-image.cond', function(){
     var rowCount = $(this).closest('tbody').find('tr').length;
-    // console.log(rowCount);
     if(rowCount == 1){
       $('.cond-table').empty();
       $('.checkbox-cond').removeClass('hidden')
@@ -932,6 +1008,7 @@ jQuery.noConflict();
     }
   })
 
+  // Mapping table Data type
   $('#transaction .mapping-table').on('change', 'select[name="data-type"]', function(){
     let type = $('option:selected', this).attr('value');
     if(type == 'select'){
@@ -954,6 +1031,8 @@ jQuery.noConflict();
     }
   });
 
+
+  // Condition data type
   $('.cond-table').on('change', 'select[name="cond-field"]', function(){
     let field = $('option:selected', this).attr('value');
     let type = vars.source.fieldinfos[field].type
@@ -977,6 +1056,8 @@ jQuery.noConflict();
     }
   });
 
+
+  // ถ้า transaction app and summary app ไม่ว่าง
   $('#summary select[name="transaction-app"], #summary select[name="summary-app"]').on('change', async function(){
     vars['summary']['tran']['appID'] = $('#summary select[name="transaction-app"]').find(':selected').val();
     
@@ -993,6 +1074,7 @@ jQuery.noConflict();
     $('#summary .period-table').empty()
     $('#summary .summary-field').empty()
 
+    // เพิ่ม summary field และ period
     if(vars['summary']['tran']['appID'] != 'null' && vars['summary']['sum']['appID'] != 'null'){
       reloadSummary(CONF.summary)
       reloadPeriod(CONF.summary.period)
@@ -1003,6 +1085,7 @@ jQuery.noConflict();
     }
   });
 
+  // เมื่อ summary ถูกเลือกทั้งสอง
   $('#summary').on('change', '.summary-field select[name="sum-source-field"], .summary-field select[name="sum-target-field"]', function(){
     $('#summary .plus-table').empty()
     $('#summary .minus-table').empty()
@@ -1012,16 +1095,22 @@ jQuery.noConflict();
     }
   });
 
+  // 
   $('#summary .mapping-table').on('change', 'select[name="source-field"]', function(){
     let val = $(this).val()
     // console.log(vars.summary.tran.fields.fieldinfos[val]['type'])
     if(vars.summary.tran.fields.fieldinfos[val]['type'] != "DATE"){
-      $('#summary .mapping-table tr:last').find('[name="format-field"]').attr('disabled', 'disabled')
+      $($(this).closest('tr')).find('[name="format-field"]').attr('disabled', 'disabled')
+      // $('#summary .mapping-table tr:last').find('[name="format-field"]').attr('disabled', 'disabled')
     }else{
-      $('#summary .mapping-table tr:last').find('[name="format-field"]').removeAttr('disabled')
+      $($(this).closest('tr')).find('[name="format-field"]').removeAttr('disabled')
+      // $('#summary .mapping-table tr:last').find('[name="format-field"]').removeAttr('disabled')
     }
   });
 
+  /**
+   * Submit function
+   */
   $('.kintoneplugin-button-dialog-ok').on('click', function(e) {
     let hasSubtable = false;
 
@@ -1114,6 +1203,7 @@ jQuery.noConflict();
         }
       }
     })
+
 
     // Summary
     summary['app']['source'] = $('select[name="transaction-app"]').find(':selected').val();

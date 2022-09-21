@@ -58,3 +58,8 @@
 input:disabled{
   display: none;
 }
+
+
+.summary-list > .set{
+  border-bottom: 2px solid black;
+}

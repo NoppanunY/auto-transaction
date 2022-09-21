@@ -34,6 +34,7 @@ jQuery.noConflict();
     }
   }
 
+
   function alertMessage(message) {
     var alertButtonClose = $('<span class="close"></span>'),
         alertMessage = $('<div class="kintoneplugin-alert popup"><span>' + message + '</span></div>');
@@ -44,6 +45,7 @@ jQuery.noConflict();
     alertMessage.append(alertButtonClose);
     $('body').append($('<div class="kintoneplugin-alert-popup"></div>').append(alertMessage));
   }
+
 
   /**
    * กำหนดค่าเริ่มต้น plugin
@@ -121,6 +123,7 @@ jQuery.noConflict();
     });
   }
 
+
   /**
    * key renew
    * @param {string} fileKey old fileKey
@@ -161,6 +164,8 @@ jQuery.noConflict();
         xhr.send();   
     })
   }
+
+
 
   function loadFields(ID){
     let fields = {
@@ -246,6 +251,8 @@ jQuery.noConflict();
     
     let period = []
     let query = ""
+
+    // ลูปแมพหาช่วงเวลาที่ต้องอัพเดท
     for(let p of config.period){
       period.push(
         `${p.source} = ${p.period}`
@@ -253,35 +260,42 @@ jQuery.noConflict();
     }
     query += period.join(" and ")
 
-    query += ` and $id in (${ids.join(", ")})`
+    if(ids.length > 0){
+      query += ` and $id in (${ids.join(", ")})`
+    }
 
+    // ดึงทุกแถวที่อยู่ในช่วงเวลา
     var sourceRecords = await fetch_record(config.app.source, query);
+
 
     let filter = []
 
+
+    // ถ้าข้อมูลใน transaction ถูกลบหมด ให้ลบของทั้งหมดใน summary
     if(sourceRecords.records.length == 0){
-      await new Promise((resolve) => {
-        kintone.api(kintone.api.url('/k/v1/records', true) + `?app${config.app.target}`, 'GET', {}, function(resp){
-          let ids = []
-          for(let record of resp.records){
-            ids.push(record['$id']['value'])
-          }
-          kintone.api(kintone.api.url('/k/v1/records', true), 'DELTE', {
-            'app': config.target,
-            'ids': ids
-          })
-        });
-      })
+      // await new Promise((resolve) => {
+      //   kintone.api(kintone.api.url('/k/v1/records', true) + `?app${config.app.target}`, 'GET', {}, function(resp){
+      //     let ids = []
+      //     for(let record of resp.records){
+      //       ids.push(record['$id']['value'])
+      //     }
+      //     kintone.api(kintone.api.url('/k/v1/records', true), 'DELTE', {
+      //       'app': config.app.target,
+      //       'ids': ids
+      //     })
+      //   });
+      // })
 
       return
     }
 
-    // let period = []
+
     let cond = {
       'plus': {},
       'minus': {}
     }
 
+    // สร้างเงื่อนไข plus
     for(let plus of config.plus){
       if(plus.target in cond){
         cond['plus'][plus.target].push(plus.cond)
@@ -290,6 +304,7 @@ jQuery.noConflict();
       }
     }
 
+    // สร้างเงื่อนไข minus
     for(let minus of config.minus){
       if(minus.target in cond){
         cond['minus'][minus.target].push(minus.cond)
@@ -298,9 +313,9 @@ jQuery.noConflict();
       }
     }
     
+    // ลูปทุกแถวที่อยู่ในช่วงเวลา
     for (let elm of sourceRecords.records) {
 
-      // console.log(elm)
       let query_target = []
       let query_source = []
       
@@ -310,24 +325,28 @@ jQuery.noConflict();
         'record': {}
       }
 
+      // กำหนด id ปลายทาง
       body['app'] = config.app.target
       
+      // ลูป mapping, grouping และสร้าง query string
       for(let map of config.mapping){
         if(map.type != "DATE"){
           query_target.push(`${map.target} = "${elm[map.source]['value']}"`);
           query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
-          body['record'][map.target] = {'value' : elm[map.source]['value']}
+          body['record'][map.target] = {
+            'value' : elm[map.source]['value']
+          }
         }else{
           if(map.formet == ""){
             query_target.push(`${map.target} = "${elm[map.source]['value']}"`);
-            // query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
+            query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
             
             body['record'][map.target] = {
               'value' : elm[map.source]['value']
             }
           }else{
             query_target.push(`${map.target} = "${luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)}"`);
-            // query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
+            query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
             
             body['record'][map.target] = {
               'value' : luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)
@@ -355,7 +374,7 @@ jQuery.noConflict();
       query_str_minus += " and " + foo.join(" and ")
       query_str_minus += " and " + period.join(" and ")
 
-      if(!filter.includes(query_str_plus) || !filter.includes(query_str_minus)){
+      if(!filter.includes(query_str_plus) && !filter.includes(query_str_minus)){
         
         console.group("Plus")
         let plus_total = await calc_summary(config.app.source ,query_str_plus , config.summary.source, {'plus': config.plus, 'minus': config.minus});
@@ -368,9 +387,11 @@ jQuery.noConflict();
         filter.push(query_str_minus)
         console.groupEnd()
         
+        // Sum
         body['record'][config.summary.target] = {'value' : plus_total-minus_total};
 
         console.table(body['record'])
+
 
         kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.app.target}&query=${query_target.join(" and ")}` , 'GET', {}, function(resp){
           if(resp.records.length == 0){
@@ -385,7 +406,8 @@ jQuery.noConflict();
           }
         })
 
-        // filter.push(isExist.join(" and "))
+        filter.push(query_str_plus)
+        filter.push(query_str_minus)
         // console.log(filter)
         // console.log(plus_total-minus_total)
       }
@@ -424,17 +446,28 @@ jQuery.noConflict();
 
     body['app'] = config.app.target
     
+    // ลูป mapping, grouping และสร้าง query string
     for(let map of config.mapping){
       if(map.type != "DATE"){
         query_target.push(`${map.target} = "${record[map.source]['value']}"`);
         query_source.push(`${map.source} = "${record[map.source]['value']}"`);
         body['record'][map.target] = {'value' : record[map.source]['value']}
       }else{
-        query_target.push(`${map.target} = "${luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)}"`);
-        query_source.push(`${map.source} = "${record[map.source]['value']}"`);
-        
-        body['record'][map.target] = {
-          'value' : luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)
+
+        if(map.formet == ""){
+          query_target.push(`${map.target} = "${record[map.source]['value']}"`);
+          query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+          
+          body['record'][map.target] = {
+            'value' : elm[map.source]['value']
+          }
+        }else{
+          query_target.push(`${map.target} = "${luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)}"`);
+          query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+          
+          body['record'][map.target] = {
+            'value' : luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)
+          }
         }
 
       }
@@ -474,6 +507,7 @@ jQuery.noConflict();
       query_str += " and " + c.join(" and ")
       query_str += " and " + period.join(" and ")
 
+      // เช็คตาราง transaction มีไหม
       let check = await new Promise((resolve) => {
         kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.app.source}&query=${query_str}`, 'GET', {},  function(resp) {
           // success
@@ -491,15 +525,19 @@ jQuery.noConflict();
       })
 
       if(check){
-        await new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
           kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.app.target}&query=${query_target.join(" and ")}` , 'GET', {}, function(resp){
-            console.table(resp.records[0])
-            kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
-              'app': config.app.target,
-              'ids': [resp.records[0]['$id']['value']]
-            }, function(resp){
+            if(resp.records.length > 0){
+              console.table(resp.records[0])
+              kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', {
+                'app': config.app.target,
+                'ids': [resp.records[0]['$id']['value']]
+              }, function(resp){
+                resolve()
+              })
+            }else{
               resolve()
-            })
+            }
           })
         }) 
       }
@@ -586,6 +624,7 @@ jQuery.noConflict();
       throw new Error('The header element is unavailable on this page');
     }
   });
+  
 
   kintone.events.on('app.record.create.submit.success', async function(event){
     var record = event.record;
@@ -605,27 +644,43 @@ jQuery.noConflict();
     let checkCond = checkCondition(cond, record);
 
     if(checkCond){
+
+      // กำหนด key
       recordsFields[config.uniqueField] = {'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')}
       // recordsFields['io_type'] = {'value': "IN"}
+
+      // วนลูปกำหนดค่าที่ไม่ใช่ subtable
       json.forEach(element => {
+
+        // เก็บค่าชื่อ table group
         if(element['source']['type'] == 'subtable'){
           subtableGroup = element['source']['value']['group'];
         }
+
+        // assign variable outside subtable
         recordsFields[element['target']['value']] = {
+          // check is select or text
           'value' : element['source']['type']=='select' ? record[element['source']['value']]['value'] : element['source']['value']
         };
       });
+      
       
       console.group("Create");
       let ids = []
       if(subtableGroup != ""){
         console.log("Start")
+
+        // loop in subtable
         for(let element of record[subtableGroup]['value']){
+
+          // define new key with record of suntable
           recordsFields[config.uniqueField] = {
             'value': kintone.app.getId().toString().padStart(3, '0') + "-" + 
                     record['$id']['value'].toString().padStart(4, '0') + "-" + 
                     element['id'].toString().padStart(4, '0')
           }
+
+          // loop find subtable and mapping
           for(let field of json){
             if(field['source']['type'] == 'subtable'){
               recordsFields[field['target']['value']] = {
@@ -634,6 +689,8 @@ jQuery.noConflict();
             }
           }
           // console.table(recordsFields)
+          
+          // api POST 
           await new Promise((resolve, reject) => {
             kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
               'app': config.targetID, 
@@ -715,10 +772,13 @@ jQuery.noConflict();
 
     var recordsFields = {};
     let subtableGroup = "";
+    let ids = []
 
     let checkCond = checkCondition(cond, record);
 
     if(checkCond){
+
+      // วนลูปกำหนดค่าที่ไม่ใช่ subtable
       json.forEach(element => {
         if(element['source']['type'] == 'subtable'){
           subtableGroup = element['source']['value']['group'];
@@ -729,19 +789,21 @@ jQuery.noConflict();
       });
       
       if(subtableGroup != ""){   
+
+        // loop old subtable
         for(let rold of old_subtable){
-        // old_subtable.forEach(rold => {
+        
             let isExist = false;
+            // เช็คว่า มีแถวที่ถูกลบไหม
             for(let rnew of record[subtableGroup]['value']){
-            // record[subtableGroup]['value'].forEach(rnew => {
               console.log(rnew)
               console.log(rold)
               if(rnew['id'] == rold['records']['id']){
                 isExist = true;
               }
-            // });
             }
             
+            // ถ้ามีแถวที่ถูกลบ ลบขแงเก่าออก
             if(!isExist){
 
               await new Promise((resolve) => {
@@ -762,32 +824,40 @@ jQuery.noConflict();
                 });   
               })
             }     
-        // })
         }
 
+        // loop in subtable
+
         for(let element of record[subtableGroup]['value']){
-        // record[subtableGroup]['value'].forEach(async (element) => {
+
+          // เหมือนกับเพื่มเลย
           let recordField = await getRecord(json, element, record);
+
+          // define new key with record of suntable
           recordField[config.uniqueField] = {
             'value': kintone.app.getId().toString().padStart(3, '0') + "-" + 
                     record['$id']['value'].toString().padStart(4, '0') + "-" + 
                     element['id'].toString().padStart(4, '0')
           }
           
+          // เช็คว่าของเก่า id อะไร
           await new Promise((resolve) => {
             kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
               'app': config.targetID,
               'query': `${config.uniqueField} in ("${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')}")`,
             }).then((resp_1) => {
               console.log(resp_1);
+              // ถ้าของเก่าไม่มีเพิ่มใหม่
               if(resp_1['records'].length == 0){
                 kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
                   'app': config.targetID,
                   'record': recordField
                 }, function(resp){
+                  ids.push(resp.id)
                   resolve(resp)
                 });
               }else{
+                // ถ้าของเก่ามีแก้ของเก่า
                 delete recordField[config.uniqueField];
                 kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
                   'app': config.targetID,
@@ -797,16 +867,17 @@ jQuery.noConflict();
                   },
                   'record': recordField
                 },async function(resp){
+                  console.log(resp_1)
                   await isExistTransaction(JSON.parse(config.summary), resp_1.records[0])
+                  ids.push(resp_1.records[0]['$id']['value'])
                   resolve(resp)
                 });
               }
             });  
           })
-        // });
         }
 
-        await updateSummary(JSON.parse(config.summary));
+        await updateSummary(JSON.parse(config.summary), ids);
 
       }else{
         kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
@@ -831,7 +902,7 @@ jQuery.noConflict();
     
     var recordsFields = {};
     let subtableGroup = "";
-    
+    let ids = []
 
     // console.log(record);
 
@@ -927,6 +998,7 @@ jQuery.noConflict();
                     'app': config.targetID,
                     'record': recordField
                   }, function(resp){
+                    ids.push(resp.id)
                     resolve(resp)
                   });
                 }else{
@@ -939,6 +1011,7 @@ jQuery.noConflict();
                     },
                     'record': recordField
                   }, function(resp){
+                    ids.push(resp.id)
                     resolve(resp)
                   });
                 }
@@ -947,7 +1020,7 @@ jQuery.noConflict();
           // });
           }
           console.groupEnd()
-          await updateSummary(JSON.parse(config.summary));
+          await updateSummary(JSON.parse(config.summary), ids);
         }else{
           kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
             'app': config.targetID,
@@ -975,9 +1048,14 @@ jQuery.noConflict();
     
     var query = `${config.uniqueField} like "${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')}"`;
     
-    await new Promise((resolve) => {
+    let ids = []
+
+    // ลบแถวใน transaction
+    await new Promise((resolve, reject) => {
       kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.targetID}&query=` + query, 'GET', {},async function(resp) {
         console.log(resp)
+
+        // ถ้ามีจะลูปจนหมด
         if(resp['records'].length > 0){
           for(let record of resp.records){
             await new Promise((resolve) => {
@@ -988,9 +1066,12 @@ jQuery.noConflict();
                 // if(!isExistTransaction(JSON.parse(config.summary), record)){
   
                 // }
+
+                // เช็คว่า transaction หมดไหม ถ้าหมดจะลบออกเลย
                 await isExistTransaction(JSON.parse(config.summary), record)
                 console.log("Delete", record['$id']['value']);
                 console.log(delete_res)
+                // ids.push(record)
                 resolve(delete_res)
               });
             })
