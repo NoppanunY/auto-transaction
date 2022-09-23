@@ -181,6 +181,7 @@ jQuery.noConflict();
                       <th class="kintoneplugin-table-th"><span class="title">Target</span></th>
                       <th class="kintoneplugin-table-th"><span class="title">Source</span></th>
                       <th class="kintoneplugin-table-th"><span class="title">Format</span></th>
+                      <!-- <th class="kintoneplugin-table-th"><span class="title">Filter</span></th> -->
                       <th class="kintoneplugin-table-th-blankspace"></th>
                     </tr>
                   </thead>
@@ -189,7 +190,7 @@ jQuery.noConflict();
                   </tbody>
                 </table>
               `,
-        row:  (sourceOptions, targetOptions) => `
+        row:  (sourceOptions, targetOptions, filterOptions) => `
                 <tr>
             
                   <td class="target-field">
@@ -222,7 +223,7 @@ jQuery.noConflict();
                     </div>
                   </td>
 
-                  <td class="format-field">
+                 <td class="format-field">
                     <div class="kintoneplugin-table-td-control">
                       <div class="kintoneplugin-table-td-control-value">
                         <div class="kintoneplugin-input-outer">
@@ -230,7 +231,23 @@ jQuery.noConflict();
                         </div>
                       </div>
                     </div>
-                  </td>
+                  </td> 
+
+                  <!-- <td class="source-field">
+                    <div class="kintoneplugin-table-td-control">
+                      <div class="kintoneplugin-table-td-control-value">
+                        <div class="kintoneplugin-select-outer">
+                          <div class="kintoneplugin-select filter-field">
+                            <select name="filter-field">
+                              <option value="null" selected hidden></option>
+                              ${filterOptions}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </td> -->
+
 
                   <td class="kintoneplugin-table-td-operation">
                     <button type="button" class="kintoneplugin-button-add-row-image" title="Add row"></button>
@@ -747,11 +764,13 @@ jQuery.noConflict();
     if(summary.mapping.length > 0){
       $('#summary .mapping-table').append(htmlFormat.summary.table.body(""));
       summary.mapping.forEach(row => {
-        $('#summary .mapping-table tbody').append(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
+        $('#summary .mapping-table tbody').append(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos), getField(vars.source.fieldinfos)))
         
         // console.log($('#summary .mapping-table tr:last').find('[name="target-field"]'))
         $('#summary .mapping-table tr:last').find('[name="target-field"]').val(row.target).change();
         $('#summary .mapping-table tr:last').find('[name="source-field"]').val(row.source).change();
+        
+        // $('#summary .mapping-table tr:last').find('[name="filter-field"]').val(row.filter).change();
         
         // console.log(vars.summary.sum.fields.fieldinfos[row.source])
 
@@ -763,7 +782,7 @@ jQuery.noConflict();
 
       });
     }else{
-      $('#summary .mapping-table').append(htmlFormat.summary.table.body(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))));
+      $('#summary .mapping-table').append(htmlFormat.summary.table.body(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos), getField(vars.source.fieldinfos))));
       $('.checkbox-cond').removeClass('hidden');
     }      
   }
@@ -794,7 +813,7 @@ jQuery.noConflict();
       $('.summary-list').append(htmlFormat.summary.summarySet.set(true))
     else
       $('.summary-list').append(htmlFormat.summary.summarySet.set(false))
-      
+
     let container = $('.summary-list .set:last-child')
     
     // $(container.find('.summary-field')).append(htmlFormat.summary.summaryField(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
@@ -973,7 +992,7 @@ jQuery.noConflict();
   
   // Add
   $('#summary .mapping-table').on('click', '.kintoneplugin-button-add-row-image', function(){
-    $(this).closest('tr').after(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)));
+    $(this).closest('tr').after(htmlFormat.summary.table.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos), getField(vars.source.fieldinfos)));
     $($(this).closest('tbody').find('tr')).each(function(){
       ($(this).find('.kintoneplugin-button-remove-row-image')).show()
     })

@@ -584,6 +584,139 @@ jQuery.noConflict();
             }
           })
         }) 
+      }else{
+        let query_target = []
+        let query_source = []
+        
+        let isExist = []
+        let body = {
+          'app': "",
+          'record': {}
+        }
+
+        // กำหนด id ปลายทาง
+        body['app'] = config.app.target
+        
+        // ลูป mapping, grouping และสร้าง query string
+        for(let map of config.mapping){
+          if(map.type != "DATE"){
+            query_target.push(`${map.target} = "${record[map.source]['value']}"`);
+            query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+            body['record'][map.target] = {
+              'value' : record[map.source]['value']
+            }
+          }else{
+            if(map.formet == ""){
+              query_target.push(`${map.target} = "${record[map.source]['value']}"`);
+              query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+              
+              body['record'][map.target] = {
+                'value' : record[map.source]['value']
+              }
+            }else{
+              query_target.push(`${map.target} = "${luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)}"`);
+              query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+              
+              body['record'][map.target] = {
+                'value' : luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)
+              }
+            }
+          }
+          // isExist.push(`${map.target} like "${elm[map.source]['value']}"`); 
+        }
+
+        for(let item of config.summaryList){
+          console.group(item.summary.target)
+          body['record'][item.summary.target] = {'value' : ""}
+
+          cond = {
+            'plus': {},
+            'minus': {}
+          }
+          
+          // สร้างเงื่อนไข plus
+          console.table(item.plus)
+          for(let plus of item.plus){
+            if(plus.target in cond.plus){
+              cond['plus'][plus.target].push(plus.cond)
+            }else{
+              cond['plus'][plus.target] = [plus.cond]
+            }
+          }
+          
+          // สร้างเงื่อนไข minus
+          for(let minus of item.minus){
+            if(minus.target in cond.minus){
+              cond['minus'][minus.target].push(minus.cond)
+            }else{
+              cond['minus'][minus.target] = [minus.cond]
+            }
+          }
+          
+          console.log(cond)
+          // PLUS
+          let query_str_plus = query_source.join(" and ")
+          let minus_total = 0
+          let plus_total = 0
+          let foo = []
+          for(const [key, value] of Object.entries(cond.plus)){
+            foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+          }
+          if(foo.length > 0){
+            query_str_plus += " and " + foo.join(" and ")
+            query_str_plus += " and " + period.join(" and ")
+            
+            console.group("Plus")
+            plus_total = await calc_summary(config.app.source ,query_str_plus , item.summary.source, {'plus': item.plus, 'minus': item.minus});
+            filter.push(query_str_plus)
+            console.groupEnd()
+          }
+
+          // MINUS
+          let query_str_minus = query_source.join(" and ")
+          foo = []
+          for(const [key, value] of Object.entries(cond.minus)){
+            foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+          }
+          if(foo.length > 0){
+            query_str_minus += " and " + foo.join(" and ")
+            query_str_minus += " and " + period.join(" and ")
+
+            console.group("Minus")
+            minus_total = await calc_summary(config.app.source ,query_str_minus , item.summary.source, {'plus': item.plus, 'minus': item.minus});
+            filter.push(query_str_minus)
+            console.groupEnd()
+          }
+          
+          console.log(plus_total, minus_total)
+          // Sum
+          body['record'][item.summary.target] = {'value' : plus_total-minus_total};
+          console.groupEnd()
+        }
+        
+        // ถ้า query ไม่เคยถูกเพิ่ม
+        // if(!filter.includes(query_str_plus) && !filter.includes(query_str_minus)){
+
+          console.table(body['record'])
+
+          kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.app.target}&query=${query_target.join(" and ")}` , 'GET', {}, function(resp){
+            if(resp.records.length == 0){
+              kintone.api(kintone.api.url('/k/v1/record', true), 'POST', body, function(resp){
+                // console.log()
+              })
+            }else{
+              body['id'] = resp.records[0]['$id']['value']
+              kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body, function(resp){
+                // console.log()
+              })
+            }
+          })
+
+          // filter.push(query_str_plus)
+          // filter.push(query_str_minus)
+          // console.log(filter)
+          // console.log(plus_total-minus_total)
+        // }
       }
 
       filter.push(isExist.join(" and "))
@@ -1121,11 +1254,13 @@ jQuery.noConflict();
               });
             })
           }
-  
-          await updateSummary(JSON.parse(config.summary)).then((result) => {
-            console.log("Delete")
-            resolve()
-          });
+          resolve()
+          // await updateSummary(JSON.parse(config.summary)).then((result) => {
+          //   console.log("Delete")
+          //   resolve()
+          // });
+        }else{
+          resolve()
         }
       });
     })
