@@ -794,6 +794,7 @@ jQuery.noConflict();
       $('.summary-list').append(htmlFormat.summary.summarySet.set(true))
     else
       $('.summary-list').append(htmlFormat.summary.summarySet.set(false))
+      
     let container = $('.summary-list .set:last-child')
     
     // $(container.find('.summary-field')).append(htmlFormat.summary.summaryField(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos)))
@@ -1146,8 +1147,12 @@ jQuery.noConflict();
       reloadPeriod(CONF.summary.period)
       
 
-      for(let [index, item] of CONF.summary.summaryList.entries()){
-        reloadCal(item.summary, item.plus, item.minus, index)
+      if('summaryList' in CONF.summary){
+        for(let [index, item] of CONF.summary.summaryList.entries()){
+          reloadCal(item.summary, item.plus, item.minus, index)
+        }
+      }else{
+        $('.summary-list').append(htmlFormat.summary.summarySet.set(true))
       }
     }
   });
@@ -1351,44 +1356,57 @@ jQuery.noConflict();
       // Plus
       tempJson['plus'] = []
       $(this).find('.plus-table tbody tr').each(function(){
-  
+        
+        // let element = {
+        //   'target' : $(this).find('[name="target-field"]'),
+        //   'cond' : $(this).find('[name="cond-value"]'),
+        // }
         let element = {
-          'target' : $(this).find('[name="target-field"]'),
-          'cond' : $(this).find('[name="cond-value"]'),
+          'target' : $(this).find('select[name="target-field"]').find(':selected').val(),
+          'cond' : $(this).find('input[name="cond-value"]').val(),
         }
   
-        if(index == 0 && element['target'].val() == 'null' || element['cond'].val() == 'null'){
+        if(index == 0 && element['target'] == 'null' || element['cond'] == 'null'){
           alert('Cond can\'t set field be null');
           check = false;
           return;
         }
   
-        tempJson.plus.push({
-          'target': element['target'].val(), 
-          'cond': element['cond'].val(), 
-        });
+        if(element['target'] != 'null'){
+          tempJson.plus.push({
+            'target': element['target'], 
+            'cond': element['cond'], 
+          });
+        }
   
       })
   
       // Minus
       tempJson['minus'] = []
       $(this).find('.minus-table tbody tr').each(function(){
-  
+        
         let element = {
-          'target' : $(this).find('[name="target-field"]'),
-          'cond' : $(this).find('[name="cond-value"]'),
+          'target' : $(this).find('select[name="target-field"]').find(':selected').val(),
+          'cond' : $(this).find('input[name="cond-value"]').val(),
         }
+
+        // let element = {
+        //   'target' : $(this).find('[name="target-field"]'),
+        //   'cond' : $(this).find('[name="cond-value"]'),
+        // }
   
-        if(index == 0 && element['target'].val() == 'null' || element['cond'].val() == 'null'){
+        if(index == 0 && element['target'] == 'null' || element['cond'] == 'null'){
           alert('Cond can\'t set field be null');
           check = false;
           return;
         }
   
-        tempJson.minus.push({
-          'target': element['target'].val(), 
-          'cond': element['cond'].val(), 
-        });
+        if(element['target'] != 'null'){
+          tempJson.minus.push({
+            'target': element['target'], 
+            'cond': element['cond'], 
+          });
+        }
   
       })
 

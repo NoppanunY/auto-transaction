@@ -295,23 +295,23 @@ jQuery.noConflict();
       'minus': {}
     }
 
-    // สร้างเงื่อนไข plus
-    for(let plus of config.plus){
-      if(plus.target in cond){
-        cond['plus'][plus.target].push(plus.cond)
-      }else{
-        cond['plus'][plus.target] = [plus.cond]
-      }
-    }
+    // // สร้างเงื่อนไข plus
+    // for(let plus of config.plus){
+    //   if(plus.target in cond){
+    //     cond['plus'][plus.target].push(plus.cond)
+    //   }else{
+    //     cond['plus'][plus.target] = [plus.cond]
+    //   }
+    // }
 
-    // สร้างเงื่อนไข minus
-    for(let minus of config.minus){
-      if(minus.target in cond){
-        cond['minus'][minus.target].push(minus.cond)
-      }else{
-        cond['minus'][minus.target] = [minus.cond]
-      }
-    }
+    // // สร้างเงื่อนไข minus
+    // for(let minus of config.minus){
+    //   if(minus.target in cond){
+    //     cond['minus'][minus.target].push(minus.cond)
+    //   }else{
+    //     cond['minus'][minus.target] = [minus.cond]
+    //   }
+    // }
     
     // ลูปทุกแถวที่อยู่ในช่วงเวลา
     for (let elm of sourceRecords.records) {
@@ -356,42 +356,79 @@ jQuery.noConflict();
         // isExist.push(`${map.target} like "${elm[map.source]['value']}"`); 
       }
 
-      // PLUS
-      let query_str_plus = query_source.join(" and ")
-      let foo = []
-      for(const [key, value] of Object.entries(cond.plus)){
-        foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
-      }
-      query_str_plus += " and " + foo.join(" and ")
-      query_str_plus += " and " + period.join(" and ")
+      for(let item of config.summaryList){
+        console.group(item.summary.target)
+        body['record'][item.summary.target] = {'value' : ""}
 
-      // MINUS
-      let query_str_minus = query_source.join(" and ")
-      foo = []
-      for(const [key, value] of Object.entries(cond.minus)){
-        foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
-      }
-      query_str_minus += " and " + foo.join(" and ")
-      query_str_minus += " and " + period.join(" and ")
+        cond = {
+          'plus': {},
+          'minus': {}
+        }
+        
+        // สร้างเงื่อนไข plus
+        console.table(item.plus)
+        for(let plus of item.plus){
+          if(plus.target in cond.plus){
+            cond['plus'][plus.target].push(plus.cond)
+          }else{
+            cond['plus'][plus.target] = [plus.cond]
+          }
+        }
+        
+        // สร้างเงื่อนไข minus
+        for(let minus of item.minus){
+          if(minus.target in cond.minus){
+            cond['minus'][minus.target].push(minus.cond)
+          }else{
+            cond['minus'][minus.target] = [minus.cond]
+          }
+        }
+        
+        console.log(cond)
+        // PLUS
+        let query_str_plus = query_source.join(" and ")
+        let minus_total = 0
+        let plus_total = 0
+        let foo = []
+        for(const [key, value] of Object.entries(cond.plus)){
+          foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+        }
+        if(foo.length > 0){
+          query_str_plus += " and " + foo.join(" and ")
+          query_str_plus += " and " + period.join(" and ")
+          
+          console.group("Plus")
+          plus_total = await calc_summary(config.app.source ,query_str_plus , item.summary.source, {'plus': item.plus, 'minus': item.minus});
+          filter.push(query_str_plus)
+          console.groupEnd()
+        }
 
-      if(!filter.includes(query_str_plus) && !filter.includes(query_str_minus)){
-        
-        console.group("Plus")
-        let plus_total = await calc_summary(config.app.source ,query_str_plus , config.summary.source, {'plus': config.plus, 'minus': config.minus});
-        filter.push(query_str_plus)
-        console.groupEnd()
+        // MINUS
+        let query_str_minus = query_source.join(" and ")
+        foo = []
+        for(const [key, value] of Object.entries(cond.minus)){
+          foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+        }
+        if(foo.length > 0){
+          query_str_minus += " and " + foo.join(" and ")
+          query_str_minus += " and " + period.join(" and ")
 
+          console.group("Minus")
+          minus_total = await calc_summary(config.app.source ,query_str_minus , item.summary.source, {'plus': item.plus, 'minus': item.minus});
+          filter.push(query_str_minus)
+          console.groupEnd()
+        }
         
-        console.group("Minus")
-        let minus_total = await calc_summary(config.app.source ,query_str_minus , config.summary.source, {'plus': config.plus, 'minus': config.minus});
-        filter.push(query_str_minus)
-        console.groupEnd()
-        
+        console.log(plus_total, minus_total)
         // Sum
-        body['record'][config.summary.target] = {'value' : plus_total-minus_total};
+        body['record'][item.summary.target] = {'value' : plus_total-minus_total};
+        console.groupEnd()
+      }
+      
+      // ถ้า query ไม่เคยถูกเพิ่ม
+      // if(!filter.includes(query_str_plus) && !filter.includes(query_str_minus)){
 
         console.table(body['record'])
-
 
         kintone.api(kintone.api.url('/k/v1/records', true) + `?app=${config.app.target}&query=${query_target.join(" and ")}` , 'GET', {}, function(resp){
           if(resp.records.length == 0){
@@ -406,11 +443,11 @@ jQuery.noConflict();
           }
         })
 
-        filter.push(query_str_plus)
-        filter.push(query_str_minus)
+        // filter.push(query_str_plus)
+        // filter.push(query_str_minus)
         // console.log(filter)
         // console.log(plus_total-minus_total)
-      }
+      // }
     }
 
     const b2 = performance.now();
@@ -419,6 +456,11 @@ jQuery.noConflict();
     console.groupEnd()
   }
 
+  /**
+   * 
+   * @param {*} config 
+   * @param {*} record 
+   */
   async function isExistTransaction(config, record){
     // console.log(config);
     
@@ -500,11 +542,13 @@ jQuery.noConflict();
     if(!filter.includes(isExist.join(" and "))){
       // PLUS
       let query_str = query_source.join(" and ")
-      let c = []
-      for(const [key, value] of Object.entries(cond.plus)){
-        c.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
-      }
-      query_str += " and " + c.join(" and ")
+      let foo = []
+      // for(const [key, value] of Object.entries(cond.plus)){
+      //   foo.push(`${key} in (${value.map(v => `"${v}"`).join(", ") })`)
+      // }
+      // if(foo.length > 0){
+      //   query_str += " and " + foo.join(" and ")
+      // }
       query_str += " and " + period.join(" and ")
 
       // เช็คตาราง transaction มีไหม
@@ -991,9 +1035,9 @@ jQuery.noConflict();
                 'app': config.targetID,
                 'query': `${config.uniqueField} in ("${kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0') + "-" + element['id'].toString().padStart(4, '0')}")`,
                 'fields': ['$id']
-              }).then((resp) => {
-                console.log(resp);
-                if(resp['records'].length == 0){
+              }).then((result) => {
+                console.log(result);
+                if(result['records'].length == 0){
                   kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
                     'app': config.targetID,
                     'record': recordField
@@ -1011,7 +1055,7 @@ jQuery.noConflict();
                     },
                     'record': recordField
                   }, function(resp){
-                    ids.push(resp.id)
+                    ids.push(result.id)
                     resolve(resp)
                   });
                 }
@@ -1034,6 +1078,7 @@ jQuery.noConflict();
           await updateSummary(JSON.parse(config.summary));
         }
       }
+      isProceed = false;
     }
   });
 
