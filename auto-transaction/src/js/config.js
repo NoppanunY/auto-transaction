@@ -9,9 +9,16 @@ jQuery.noConflict();
   const ignoreField = ['id', 'status', 'app_id', 'ref_record_no'];
 
   const CONF = kintone.plugin.app.getConfig(PLUGIN_ID);
-
-  if('summary' in CONF)
+  
+  if('summary' in CONF){
     CONF['summary'] = JSON.parse(kintone.plugin.app.getConfig(PLUGIN_ID)['summary']);
+  }else{
+    // CONF['summary'] = {
+    //   'mapping': [],
+    //   'period': [],
+    //   'summaryList': []
+    // }
+  }
   
   // Template Html
 
@@ -1162,17 +1169,27 @@ jQuery.noConflict();
 
     // เพิ่ม summary field และ period
     if(vars['summary']['tran']['appID'] != 'null' && vars['summary']['sum']['appID'] != 'null'){
-      reloadSummary(CONF.summary)
-      reloadPeriod(CONF.summary.period)
-      
+      if('summary' in CONF){
+        reloadSummary(CONF.summary)
+        reloadPeriod(CONF.summary.period)
 
-      if('summaryList' in CONF.summary){
-        for(let [index, item] of CONF.summary.summaryList.entries()){
-          reloadCal(item.summary, item.plus, item.minus, index)
+        if('summaryList' in CONF.summary){
+          for(let [index, item] of CONF.summary.summaryList.entries()){
+            reloadCal(item.summary, item.plus, item.minus, index)
+          }
+        }else{
+          $('.summary-list').append(htmlFormat.summary.summarySet.set(true))
         }
       }else{
+        reloadSummary({
+          'mapping': []
+        })
+        
+        reloadPeriod([])
+        
         $('.summary-list').append(htmlFormat.summary.summarySet.set(true))
       }
+
     }
   });
 
