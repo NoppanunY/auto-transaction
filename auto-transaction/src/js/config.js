@@ -26,7 +26,7 @@ jQuery.noConflict();
     transaction: {
       table: {
         body: (tableBody) => `
-                <p class="kintoneplugin-desc">Set mapping fields</p>
+                <div class="title">Set mapping fields</div>
                 <table class="kintoneplugin-table">
                   <thead>
                     <tr>
@@ -97,21 +97,23 @@ jQuery.noConflict();
               `
       },
       unique: (options) => `
-                <span>Save Reference Record ID to :&nbsp;</span> 
-                <div class="kintoneplugin-select-outer">
-                  <div class="kintoneplugin-select unique-field">
-                    <select name="unique-field">
-                      <option value="null" selected hidden></option>
-                      ${options}
-                    </select>
+                  <div class="title">Save Reference Record ID to</div>
+                  <div class="input">
+                    <div class="kintoneplugin-select-outer">
+                      <div class="kintoneplugin-select unique-field">
+                        <select name="unique-field">
+                          <option value="null" selected hidden></option>
+                          ${options}
+                        </select>
+                      </div>
+                    </div>
                   </div>
-                </div>
               `
     },
     condition: {
       table: {
         body: (tableBody) => `
-                <p class="kintoneplugin-desc">Set Condition</p>
+                <div class="title">Set Condition</div>
                 <table class="kintoneplugin-table">
                   <thead>
                     <tr>
@@ -181,7 +183,10 @@ jQuery.noConflict();
     summary: {
       table: {
         body: (tableBody) => `
-                <p class="kintoneplugin-desc">Set mapping fields</p>
+                <div class="title">Set mapping fields</div>
+                <div class="desc">
+                  Format date <a href="https://moment.github.io/luxon/#/parsing?id=table-of-tokens" target="_blank">here.</a>
+                </div>  
                 <table class="kintoneplugin-table">
                   <thead>
                     <tr>
@@ -266,17 +271,20 @@ jQuery.noConflict();
       summarySet : {
         set: (isCore) => `
           <div class="set">
-            <div class="kintoneplugin-row summary-field">
+            <div class="dt-form-group dt-row dt-center summary-field">
               ${htmlFormat.summary.summaryField(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))}
             </div>
 
-            <div class="kintoneplugin-row plus-table">
+            <div class="dt-form-group plus-table">
             </div>
 
-            <div class="kintoneplugin-row minus-table">
+            <div class="dt-form-group minus-table">
             </div>
 
-            <div class="kintoneplugin-table-td-operation">
+            <div class="dt-form-group dt-row kintoneplugin-table-td-operation">
+              ${
+                (isCore) ? '<div class="title">Add field</div>' : '<div class="title">Add/Remove field</div>'
+              }
               <button type="button" class="kintoneplugin-button-add-row-image add-row" title="Add row"></button>
               ${
                 (!isCore) ? `<button type="button" class="kintoneplugin-button-remove-row-image remove-row" title="Add row"></button>` : ""
@@ -287,7 +295,7 @@ jQuery.noConflict();
       },
       periodTable: {
         body: (tableBody) => `
-                <p class="kintoneplugin-desc">Set period conditions</p>
+                <div class="title">Set period conditions</div>
                 <table class="kintoneplugin-table">
                   <thead>
                     <tr>
@@ -344,7 +352,7 @@ jQuery.noConflict();
       },
       plusTable: {
         body: (tableBody) => `
-                <p class="kintoneplugin-desc">Set plus conditions</p>
+                <div class="title">Set plus conditions</div>
                 <table class="kintoneplugin-table">
                   <thead>
                     <tr>
@@ -395,7 +403,7 @@ jQuery.noConflict();
       },
       minusTable: {
         body: (tableBody) => `
-                <p class="kintoneplugin-desc">Set minus conditions</p>
+                <div class="title">Set minus conditions</div>
                 <table class="kintoneplugin-table">
                   <thead>
                     <tr>
@@ -449,7 +457,7 @@ jQuery.noConflict();
               `
       },
       summaryField: (sourceOptions, targetOptions) => `
-                      <p class="kintoneplugin-desc">Select summary fields</p>
+                      <div class="title">Summary from </div>
                       <div class="kintoneplugin-select-outer">
                         <div class="kintoneplugin-select">
                           <select name="sum-source-field">
@@ -458,15 +466,15 @@ jQuery.noConflict();
                           </select>
                         </div>
                       </div>
-                      =>
+                      <div class="title"> to </div>
                       <div class="kintoneplugin-select-outer">
-                      <div class="kintoneplugin-select">
-                        <select name="sum-target-field">
-                          <option value="null" selected hidden></option>
-                          ${targetOptions}
-                        </select>
+                        <div class="kintoneplugin-select">
+                          <select name="sum-target-field">
+                            <option value="null" selected hidden></option>
+                            ${targetOptions}
+                          </select>
+                        </div>
                       </div>
-                    </div>
                     `
     },
     optionGroup: (groupName, options) => `
@@ -1075,7 +1083,7 @@ jQuery.noConflict();
       
       // htmlFormat.summary.minusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))
     $($(this).closest('tbody').find('tr')).each(function(){ 
-      ($(this).find('.kintoneplugin-button-remove-row-image')).show()
+      // ($(this).find('.kintoneplugin-button-remove-row-image')).show()
     })
   })
   
@@ -1186,7 +1194,7 @@ jQuery.noConflict();
         })
         
         reloadPeriod([])
-        
+
         $('.summary-list').append(htmlFormat.summary.summarySet.set(true))
       }
 
@@ -1288,6 +1296,7 @@ jQuery.noConflict();
 
       if( element['source']['select'].val() == 'null' || element['target']['select'].val() == 'null' || element['target']['select'].val() == ''){
         alert('Can\'t set field be null');
+        check = false;
         return;
       }
 

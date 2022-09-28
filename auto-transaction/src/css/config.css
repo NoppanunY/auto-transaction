@@ -1,34 +1,121 @@
+/*
+* Reset kintone style
+*/
+.gaia-admin-app-plugin-config-description{
+  position: relative;
+  background-color: #f1f1f1;
+  padding: 1rem;
+}
+
+.settings-heading {
+  font-size: 18px;
+}
+
+.kintoneplugin-desc{
+  font-size: 12px;
+}
+
+.kintoneplugin-select{
+  margin: 0;
+}
+
+.kintoneplugin-table{
+  margin-bottom: 0px;
+}
+
+/* 
+* Double transaction style 
+*/
+
 .dt-sec{
   display: flex;
   flex-direction: column;
   row-gap: .5rem;
   margin-bottom: 1.5rem;
+  background-color: white;
+  padding: 1rem;
+  border-radius: 3px;
 }
 
-.settings-heading {
-  padding-left: 4px;
-  border-left: 4px solid rgb(201, 201, 201);
-  border-bottom: 2px solid rgb(201, 201, 201);
+.dt-sec.desc{
+  padding: 1rem 1rem 0rem 1rem;
+  background-color: #f1f1f1;
 }
+
+
+
 
 .dt-sec .sec-title{
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: bold;
-  padding: .5rem 0;
-  border-top: 2px solid rgb(201, 201, 201);
-  border-bottom: 2px solid rgb(201, 201, 201);
+  border-bottom: 1px solid rgb(236, 236, 236);
+}
+
+.sec-desc{
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 1rem;
 }
 
 .dt-paragraph{
   position: relative;
-  padding-left: 1rem;
+  padding-left: 2rem;
 }
 
-/* Input */
+/* Group Input */
+.dt-form-group{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.dt-form-group:empty{
+  margin-bottom: 0rem;
+}
+
+.dt-form-group.dt-row{
+  display: flex;
+  flex-direction: row;
+  column-gap: .5rem;
+  align-items: flex-end;
+}
+
+.dt-form-group.dt-row.dt-center{
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
 .dt-form-group.horizontal{
   display: flex;
   flex-direction: row;
   column-gap: .5rem;
+  align-items: center;
+}
+
+.dt-form-group .title{
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: .5rem;
+}
+.dt-form-group .desc{
+  font-size: 12px;
+  font-weight: 200;
+  margin-bottom: .7rem;
+  color: #888;
+}
+
+.dt-form-group .desc a:hover{
+  text-decoration: underline;
+}
+
+.dt-form-group.dt-row .title{
+  margin-bottom: 0rem;
+}
+
+.dt-form-group.dt-center{
+  display: flex;
   align-items: center;
 }
 
@@ -46,6 +133,7 @@
   font-size: 14px;
 }
 
+
 .kintoneplugin-button-remove-row-image.hidden,
 .kintoneplugin-button-remove-row-image.hidden-cond{
   display: none;
@@ -59,7 +147,11 @@ input:disabled{
   display: none;
 }
 
+.summary-list{
+  width: 100%;
+}
 
 .summary-list > .set{
-  border-bottom: 2px solid black;
+  padding-top: 1rem;
+  border-top: 2px solid rgb(216, 216, 216);
 }
