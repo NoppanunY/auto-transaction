@@ -334,8 +334,10 @@ jQuery.noConflict();
                           <div class="kintoneplugin-select period-field">
                             <select name="period-field">
                               <option value="null" selected hidden></option>
-                              <option value="THIS_MONTH()" >This Month</option>
-                              <option value="THIS_YEAR()" >This Year</option>
+                              <option value="THIS_MONTH()">This Month</option>
+                              <option value="THIS_YEAR()">This Year</option>
+                              <option value="a_month_of">A Month of</option>
+                              <option value="a_year_of">A Year of</option>
                             </select>
                           </div>
                         </div>
@@ -610,11 +612,12 @@ jQuery.noConflict();
   }
 
   function getField(fields){
+
     let htmlOptions = ""
     let optionGroup = [];
 
     let sorted = []
-
+    
     for(let key in fields){
       sorted.push(key)
     }
@@ -676,13 +679,98 @@ jQuery.noConflict();
           });
 
         default :
-        htmlOptions += `<option value="${fields[key].code}">${fields[key].label}</option>`;
+          htmlOptions += `<option value="${fields[key].code}">${fields[key].label}</option>`;
       }
     }
 
     optionGroup.forEach(element => {
       htmlOptions += htmlFormat.optionGroup(element.label, element.options)
     });
+
+    return htmlOptions;
+  }
+
+  function getFieldDate(fields){
+
+    let htmlOptions = ""
+    let optionGroup = [];
+
+    let sorted = []
+    
+    for(let key in fields){
+      sorted.push(key)
+    }
+    
+    for(let i=0; i<sorted.length; i++){
+      for(let j=0; j<sorted.length; j++){
+        if(fields[sorted[j]].label >= fields[sorted[i]].label){
+          let temp = sorted[i]
+          sorted[i] = sorted[j]
+          sorted[j] = temp
+        }
+      }
+    }
+    
+    for(const key of sorted){
+    // for (const [key, field] of Object.entries(fields)){
+      switch(fields[key].type){
+        case 'CATEGORY':
+        case 'CREATED_TIME':
+        case 'CREATOR':
+        case 'FILE':
+        case 'MODIFIER':
+        case 'REFERENCE_TABLE':
+        case 'STATUS':
+        case 'STATUS_ASSIGNEE':
+        case 'UPDATED_TIME':
+        case 'RECORD_NUMBER':
+          break;
+        case 'DATE':
+          htmlOptions += `<option value="${fields[key].code}">${fields[key].label}</option>`;
+          break;
+        case 'SUBTABLE':
+          // console.log(fields[key]);
+          optionGroup.push({
+            'label': fields[key].label,
+            'value': fields[key].code,
+            'options': ((foo, group) => {
+              let str = "";
+
+              let nestedSorted = []
+
+              for(let key in foo){
+                nestedSorted.push(key)
+              }
+              
+              for(let i=0; i<nestedSorted.length; i++){
+                for(let j=0; j<nestedSorted.length; j++){
+                  if(foo[nestedSorted[j]].label >= foo[nestedSorted[i]].label){
+                    let temp = nestedSorted[i]
+                    nestedSorted[i] = nestedSorted[j]
+                    nestedSorted[j] = temp
+                  }
+                }
+              }
+
+              for(const key of nestedSorted){
+                if(foo[key]['type'] == "DATE"){
+                  let value = foo[key]
+                  str += `<option value="${value.code}" group="${group}">${value.label}</option>`;
+                }
+              }
+              return str;
+            })(fields[key].fields, fields[key].code)
+          });
+
+        default :
+      }
+    }
+
+    if(optionGroup.length == 0){
+      optionGroup.forEach(element => {
+        htmlOptions += htmlFormat.optionGroup(element.label, element.options)
+      });
+    }
 
     return htmlOptions;
   }
@@ -807,10 +895,11 @@ jQuery.noConflict();
     if(period.length > 0){
       $('#summary .period-table').append(htmlFormat.summary.periodTable.body(""));
       period.forEach(row => {
-        $('#summary .period-table tbody').append(htmlFormat.summary.periodTable.row(getField(vars.summary.tran.fields.fieldinfos)))
+        $('#summary .period-table tbody').append(htmlFormat.summary.periodTable.row(getFieldDate(vars.summary.tran.fields.fieldinfos)))
         
         $('#summary .period-table tr:last').find('[name="source-field"]').val(row.source).change();
         $('#summary .period-table tr:last').find('[name="period-field"]').val(row.period).change();
+        $('#summary .period-table tr:last').find('[name="period-source-field"]').val(row.periodSource).change();
       });
 
       if(period.length == 1){
@@ -818,7 +907,7 @@ jQuery.noConflict();
       }
     }else{
       $('#summary .period-table').append(htmlFormat.summary.periodTable.body(htmlFormat.summary.periodTable.row(
-        getField(vars.summary.tran.fields.fieldinfos))));
+        getFieldDate(vars.summary.tran.fields.fieldinfos))));
       $('.checkbox-cond').removeClass('hidden');
     }      
   }
@@ -1024,7 +1113,7 @@ jQuery.noConflict();
 
    // Add
    $('#summary .period-table').on('click', '.kintoneplugin-button-add-row-image', function(){
-    $(this).closest('tr').after(htmlFormat.summary.periodTable.row(getField(vars.summary.tran.fields.fieldinfos)));
+    $(this).closest('tr').after(htmlFormat.summary.periodTable.row(getFieldDate(vars.summary.tran.fields.fieldinfos)));
     $($(this).closest('tbody').find('tr')).each(function(){ 
       ($(this).find('.kintoneplugin-button-remove-row-image')).show()
     })
@@ -1214,13 +1303,41 @@ jQuery.noConflict();
         htmlFormat.summary.plusTable.body(
           htmlFormat.summary.plusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))
         )
-      )
+      ) 
       
       $(this).closest('.set').find('.minus-table').html(
         htmlFormat.summary.minusTable.body(
           htmlFormat.summary.minusTable.row(getField(vars.summary.tran.fields.fieldinfos), getField(vars.summary.sum.fields.fieldinfos))
         )
       )
+    }
+  });
+
+
+  $('#summary').on('change', '[name="period-field"]', function(){
+    let periodType = $(this).val()
+
+    
+    if(periodType == "a_month_of" || periodType == "a_year_of"){
+      console.log(vars.source.fieldinfos)
+      if($(this).closest('.kintoneplugin-table-td-control-value').find('.kintoneplugin-select-outer').length > 1){
+        $(this).closest('.kintoneplugin-table-td-control-value').find('.kintoneplugin-select-outer')[1].remove()
+      }
+      $(this).closest('.kintoneplugin-table-td-control-value').append(`
+        <div class="kintoneplugin-select-outer">
+          <div class="kintoneplugin-select period-source-field">
+            <select name="period-source-field">
+              <option value="null" selected hidden></option>
+              ${getFieldDate(vars.source.fieldinfos)}
+            </select>
+          </div>
+        </div> 
+      `)
+      // console.log($(this).closest('.kintoneplugin-table-td-control-value').find('.kintoneplugin-select-outer [name="period-target-field"]'))
+    }else{
+      if($(this).closest('.kintoneplugin-table-td-control-value').find('.kintoneplugin-select-outer').length > 1){
+        $(this).closest('.kintoneplugin-table-td-control-value').find('.kintoneplugin-select-outer')[1].remove()
+      }
     }
   });
 
@@ -1370,6 +1487,7 @@ jQuery.noConflict();
       let element = {
         'source' : $(this).find('[name="source-field"]'),
         'period' : $(this).find('[name="period-field"]'),
+        'periodSource': ""
       }
 
       if( element['source'].val() == 'null' || element['period'].val() == 'null'){
@@ -1378,9 +1496,14 @@ jQuery.noConflict();
         return;
       }
 
+      if(element['period'].val() == "a_month_of" || element['period'].val() == "a_year_of"){
+        element['periodSource'] = $(this).find('[name="period-source-field"]').val()
+      }
+
       summary.period.push({
         'source': element['source'].val(), 
         'period': element['period'].val(), 
+        'periodSource': element['periodSource']
       });
 
     })
@@ -1411,11 +1534,11 @@ jQuery.noConflict();
           'cond' : $(this).find('input[name="cond-value"]').val(),
         }
   
-        if(index == 0 && element['target'] == 'null' || element['cond'] == 'null'){
-          alert('Cond can\'t set field be null');
-          check = false;
-          return;
-        }
+        // if(index == 0 && element['target'] == 'null' || element['cond'] == 'null'){
+        //   alert('Cond can\'t set field be null');
+        //   check = false;
+        //   return;
+        // }
   
         if(element['target'] != 'null'){
           tempJson.plus.push({
@@ -1440,11 +1563,11 @@ jQuery.noConflict();
         //   'cond' : $(this).find('[name="cond-value"]'),
         // }
   
-        if(index == 0 && element['target'] == 'null' || element['cond'] == 'null'){
-          alert('Cond can\'t set field be null');
-          check = false;
-          return;
-        }
+        // if(index == 0 && element['target'] == 'null' || element['cond'] == 'null'){
+        //   alert('Cond can\'t set field be null');
+        //   check = false;
+        //   return;
+        // }
   
         if(element['target'] != 'null'){
           tempJson.minus.push({

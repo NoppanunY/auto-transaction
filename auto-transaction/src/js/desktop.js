@@ -242,7 +242,7 @@ jQuery.noConflict();
     })
   }
   
-  async function updateSummary(config, ids){
+  async function updateSummary(config, ids, record){
     // console.log(config);
     
     const b1 = performance.now();
@@ -253,15 +253,40 @@ jQuery.noConflict();
     let query = ""
 
     // ลูปแมพหาช่วงเวลาที่ต้องอัพเดท
+    // for(let p of config.period){
+    //   if(p.period == "a_month_of" || p.period == "a_year_of"){
+    //     let start = luxon.DateTime.fromISO(currRec[p.periodSource]['value']).toFormat("yyyy-MM-dd")
+
+    //     let month = new Date(currRec[p.periodSource]['value']).getMonth()
+    //     let year = new Date(currRec[p.periodSource]['value']).getFullYear()
+        
+    //     let end = luxon.DateTime.fromISO(new Date(year, month + 1, 0)).toFormat("yyyy-MM-dd")
+    //     period.push(
+    //       `${p.source} >= "${start}" and ${p.source} <= "${end}"`
+    //     );
+    //   }else{
+    //     period.push(
+    //       `${p.source} = ${p.period}`
+    //     );
+    //   }
+    // }
+
     for(let p of config.period){
-      period.push(
-        `${p.source} = ${p.period}`
-      );
+      if(p.period == "a_month_of" || p.period == "a_year_of"){
+
+      }else{
+        period.push(
+          `${p.source} = ${p.period}`
+        );
+      }
     }
-    query += period.join(" and ")
+    if(period.length > 0){
+      query += period.join(" and ")
+      query += " and "
+    }
 
     if(ids.length > 0){
-      query += ` and $id in (${ids.join(", ")})`
+      query += `$id in (${ids.join(", ")})`
     }
 
     // ดึงทุกแถวที่อยู่ในช่วงเวลา
@@ -339,14 +364,14 @@ jQuery.noConflict();
         }else{
           if(map.formet == ""){
             query_target.push(`${map.target} = "${elm[map.source]['value']}"`);
-            query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
+            // query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
             
             body['record'][map.target] = {
               'value' : elm[map.source]['value']
             }
           }else{
             query_target.push(`${map.target} = "${luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)}"`);
-            query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
+            // query_source.push(`${map.source} = "${elm[map.source]['value']}"`);
             
             body['record'][map.target] = {
               'value' : luxon.DateTime.fromISO(elm[map.source]['value']).toFormat(map.format)
@@ -384,6 +409,33 @@ jQuery.noConflict();
           }
         }
         
+        period = []
+
+        // ลูปแมพหาช่วงเวลาที่ต้องอัพเดท
+        for(let p of config.period){
+          if(p.period == "a_month_of" || p.period == "a_year_of"){
+            // let start = luxon.DateTime.fromISO(record[p.periodSource]['value']).toFormat("yyyy-MM-dd")
+            let month = new Date(record[p.periodSource]['value']).getMonth()
+            let year = new Date(record[p.periodSource]['value']).getFullYear()
+
+            let start = luxon.DateTime.fromISO((new Date(year, month, 1)).toISOString().substring(0, 10)).toFormat("yyyy-MM-dd")
+
+            // let start = luxon.DateTime.fromISO(elm[p.periodSource]['value']).toFormat("yyyy-MM-dd")
+
+            // let month = new Date(elm[p.periodSource]['value']).getMonth()
+            // let year = new Date(elm[p.periodSource]['value']).getFullYear()
+            
+            let end = luxon.DateTime.fromISO((new Date(year, month + 1, 0)).toISOString().substring(0, 10)).toFormat("yyyy-MM-dd")
+            period.push(
+              `${p.source} >= "${start}" and ${p.source} <= "${end}"`
+            );
+          }else{
+            period.push(
+              `${p.source} = ${p.period}`
+            );
+          }
+        }
+
         console.log(cond)
         // PLUS
         let query_str_plus = query_source.join(" and ")
@@ -395,6 +447,7 @@ jQuery.noConflict();
         }
         if(foo.length > 0){
           query_str_plus += " and " + foo.join(" and ")
+          if(period.length > 0)
           query_str_plus += " and " + period.join(" and ")
           
           console.group("Plus")
@@ -411,6 +464,7 @@ jQuery.noConflict();
         }
         if(foo.length > 0){
           query_str_minus += " and " + foo.join(" and ")
+          if(period.length > 0)
           query_str_minus += " and " + period.join(" and ")
 
           console.group("Minus")
@@ -461,7 +515,7 @@ jQuery.noConflict();
    * @param {*} config 
    * @param {*} record 
    */
-  async function isExistTransaction(config, record){
+  async function isExistTransaction(config, record, currRec){
     // console.log(config);
     
     console.group("Check is exist")
@@ -498,14 +552,14 @@ jQuery.noConflict();
 
         if(map.formet == ""){
           query_target.push(`${map.target} = "${record[map.source]['value']}"`);
-          query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+          // query_source.push(`${map.source} = "${record[map.source]['value']}"`);
           
           body['record'][map.target] = {
             'value' : elm[map.source]['value']
           }
         }else{
           query_target.push(`${map.target} = "${luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)}"`);
-          query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+          // query_source.push(`${map.source} = "${record[map.source]['value']}"`);
           
           body['record'][map.target] = {
             'value' : luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)
@@ -518,11 +572,32 @@ jQuery.noConflict();
     }
 
     for(let p of config.period){
-      period.push(
-        `${p.source} = ${p.period}`
-      );
-    }
+      for(let p of config.period){
+        if(p.period == "a_month_of" || p.period == "a_year_of"){
+          // let start = luxon.DateTime.fromISO(record[p.periodSource]['value']).toFormat("yyyy-MM-dd")
+          let month = new Date(currRec[p.periodSource]['value']).getMonth()
+          let year = new Date(currRec[p.periodSource]['value']).getFullYear()
 
+          let start = luxon.DateTime.fromISO((new Date(year, month, 1)).toISOString().substring(0, 10)).toFormat("yyyy-MM-dd")
+
+          // let start = luxon.DateTime.fromISO(elm[p.periodSource]['value']).toFormat("yyyy-MM-dd")
+
+          // let month = new Date(elm[p.periodSource]['value']).getMonth()
+          // let year = new Date(elm[p.periodSource]['value']).getFullYear()
+          
+          let end = luxon.DateTime.fromISO((new Date(year, month + 1, 0)).toISOString().substring(0, 10)).toFormat("yyyy-MM-dd")
+          
+          period.push(
+            `${p.source} >= "${start}" and ${p.source} <= "${end}"`
+          );
+        }else{
+          period.push(
+            `${p.source} = ${p.period}`
+          );
+        }
+      }
+    }
+    
     for(let c of config.plus){
       if(c.target in cond){
         cond['plus'][c.target].push(c.cond)
@@ -549,7 +624,9 @@ jQuery.noConflict();
       // if(foo.length > 0){
       //   query_str += " and " + foo.join(" and ")
       // }
-      query_str += " and " + period.join(" and ")
+      if(period.length > 0){
+        query_str += " and " + period.join(" and ")
+      }
 
       // เช็คตาราง transaction มีไหม
       let check = await new Promise((resolve) => {
@@ -608,14 +685,14 @@ jQuery.noConflict();
           }else{
             if(map.formet == ""){
               query_target.push(`${map.target} = "${record[map.source]['value']}"`);
-              query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+              // query_source.push(`${map.source} = "${record[map.source]['value']}"`);
               
               body['record'][map.target] = {
                 'value' : record[map.source]['value']
               }
             }else{
               query_target.push(`${map.target} = "${luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)}"`);
-              query_source.push(`${map.source} = "${record[map.source]['value']}"`);
+              // query_source.push(`${map.source} = "${record[map.source]['value']}"`);
               
               body['record'][map.target] = {
                 'value' : luxon.DateTime.fromISO(record[map.source]['value']).toFormat(map.format)
@@ -653,6 +730,33 @@ jQuery.noConflict();
             }
           }
           
+          period = []
+
+          // ลูปแมพหาช่วงเวลาที่ต้องอัพเดท
+          for(let p of config.period){
+            if(p.period == "a_month_of" || p.period == "a_year_of"){
+              // let start = luxon.DateTime.fromISO(record[p.periodSource]['value']).toFormat("yyyy-MM-dd")
+              let month = new Date(currRec[p.periodSource]['value']).getMonth()
+              let year = new Date(currRec[p.periodSource]['value']).getFullYear()
+
+              let start = luxon.DateTime.fromISO((new Date(year, month, 1)).toISOString().substring(0, 10)).toFormat("yyyy-MM-dd")
+
+              // let start = luxon.DateTime.fromISO(elm[p.periodSource]['value']).toFormat("yyyy-MM-dd")
+
+              // let month = new Date(elm[p.periodSource]['value']).getMonth()
+              // let year = new Date(elm[p.periodSource]['value']).getFullYear()
+              
+              let end = luxon.DateTime.fromISO((new Date(year, month + 1, 0)).toISOString().substring(0, 10)).toFormat("yyyy-MM-dd")
+              period.push(
+                `${p.source} >= "${start}" and ${p.source} <= "${end}"`
+              );
+            }else{
+              period.push(
+                `${p.source} = ${p.period}`
+              );
+            }
+          }
+          
           console.log(cond)
           // PLUS
           let query_str_plus = query_source.join(" and ")
@@ -664,6 +768,7 @@ jQuery.noConflict();
           }
           if(foo.length > 0){
             query_str_plus += " and " + foo.join(" and ")
+            if(period.length > 0)
             query_str_plus += " and " + period.join(" and ")
             
             console.group("Plus")
@@ -680,6 +785,7 @@ jQuery.noConflict();
           }
           if(foo.length > 0){
             query_str_minus += " and " + foo.join(" and ")
+            if(period.length > 0)
             query_str_minus += " and " + period.join(" and ")
 
             console.group("Minus")
@@ -787,8 +893,9 @@ jQuery.noConflict();
     /*---------------------------------------------------------------
     initialize fields
     ---------------------------------------------------------------*/
-    settingPlugin()
 
+    settingPlugin()
+    
     vars['source'] = await loadFields(AppID);
   });
 
@@ -883,18 +990,20 @@ jQuery.noConflict();
         }
         console.log("End")
         
-        await updateSummary(JSON.parse(config.summary), ids);
+        await updateSummary(JSON.parse(config.summary), ids, record);
       }else{
+        let ids = []
         await new Promise((resolve) => {
           kintone.api(kintone.api.url('/k/v1/record', true), 'POST', {
             'app': config.targetID,
             'record': recordsFields
           }, function(resp){
             resolve(resp)
+            ids.push(resp.id)
           });
         })
        
-        await updateSummary(JSON.parse(config.summary));
+        await updateSummary(JSON.parse(config.summary), ids, record);
       }
       
     }
@@ -994,7 +1103,7 @@ jQuery.noConflict();
                       'ids': [resp['records'][0]['$id']['value']]
                     }).then(async (delete_res) => {
                       console.log("Delete", resp['records'][0]);
-                      await isExistTransaction(JSON.parse(config.summary), resp.records[0])
+                      await isExistTransaction(JSON.parse(config.summary), resp.records[0], event.record)
                       resolve(resp)
                     });
                   }
@@ -1045,7 +1154,7 @@ jQuery.noConflict();
                   'record': recordField
                 },async function(resp){
                   console.log(resp_1)
-                  await isExistTransaction(JSON.parse(config.summary), resp_1.records[0])
+                  await isExistTransaction(JSON.parse(config.summary), resp_1.records[0], event.record)
                   ids.push(resp_1.records[0]['$id']['value'])
                   resolve(resp)
                 });
@@ -1054,9 +1163,10 @@ jQuery.noConflict();
           })
         }
 
-        await updateSummary(JSON.parse(config.summary), ids);
+        await updateSummary(JSON.parse(config.summary), ids, record);
 
       }else{
+        let ids = []
         kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
           'app': config.targetID,
           'updateKey': {
@@ -1064,9 +1174,11 @@ jQuery.noConflict();
             'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')
           },
           'record': recordsFields
+        }, function(resp){
+          ids.push(resp.id)
         });
 
-        await updateSummary(JSON.parse(config.summary));
+        await updateSummary(JSON.parse(config.summary), ids, record);
       }
     }
   });
@@ -1146,7 +1258,7 @@ jQuery.noConflict();
                       'app': config.targetID,
                       'ids': [resp['records'][0]['$id']['value']]
                     }).then(async (delete_res) => {
-                      await isExistTransaction(JSON.parse(config.summary), resp.records[0])
+                      await isExistTransaction(JSON.parse(config.summary), resp.records[0], event.record)
                       console.log("Delete", resp['records'][0]);
                     });
                   }
@@ -1197,8 +1309,9 @@ jQuery.noConflict();
           // });
           }
           console.groupEnd()
-          await updateSummary(JSON.parse(config.summary), ids);
+          await updateSummary(JSON.parse(config.summary), ids, record);
         }else{
+          let ids = []
           kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
             'app': config.targetID,
             'updateKey': {
@@ -1206,9 +1319,11 @@ jQuery.noConflict();
               'value': kintone.app.getId().toString().padStart(3, '0') + "-" + record['$id']['value'].toString().padStart(4, '0')
             },
             'record': recordsFields
+          }, function(resp){
+            ids.push(resp.id)
           });
 
-          await updateSummary(JSON.parse(config.summary));
+          await updateSummary(JSON.parse(config.summary), ids, record);
         }
       }
       isProceed = false;
@@ -1246,7 +1361,7 @@ jQuery.noConflict();
                 // }
 
                 // เช็คว่า transaction หมดไหม ถ้าหมดจะลบออกเลย
-                await isExistTransaction(JSON.parse(config.summary), record)
+                await isExistTransaction(JSON.parse(config.summary), record, event.record)
                 console.log("Delete", record['$id']['value']);
                 console.log(delete_res)
                 // ids.push(record)
